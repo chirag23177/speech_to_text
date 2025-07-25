@@ -20,6 +20,7 @@ class SpeechTranslator {
         this.elements = {
             micButton: document.getElementById('mic-button'),
             statusText: document.getElementById('status-text'),
+            statusDot: document.getElementById('status-dot'),
             sourceLang: document.getElementById('source-lang'),
             targetLang: document.getElementById('target-lang'),
             swapButton: document.getElementById('swap-languages'),
@@ -27,7 +28,14 @@ class SpeechTranslator {
             translationOutput: document.getElementById('translation-output'),
             copyInputBtn: document.getElementById('copy-input'),
             copyOutputBtn: document.getElementById('copy-output'),
-            loadingOverlay: document.getElementById('loading-overlay')
+            speakOutputBtn: document.getElementById('speak-output'),
+            loadingOverlay: document.getElementById('loading-overlay'),
+            themeToggle: document.getElementById('theme-toggle'),
+            clearAllBtn: document.getElementById('clear-all'),
+            settingsBtn: document.getElementById('settings-btn'),
+            audioVisualizer: document.getElementById('audio-visualizer'),
+            confidenceIndicator: document.getElementById('confidence-indicator'),
+            confidenceText: document.querySelector('.confidence-text')
         };
     }
 
@@ -63,6 +71,26 @@ class SpeechTranslator {
             this.copyToClipboard('output');
         });
 
+        // Speak output button
+        this.elements.speakOutputBtn.addEventListener('click', () => {
+            this.speakText('output');
+        });
+
+        // Theme toggle
+        this.elements.themeToggle.addEventListener('click', () => {
+            this.toggleTheme();
+        });
+
+        // Clear all button
+        this.elements.clearAllBtn.addEventListener('click', () => {
+            this.clearAllText();
+        });
+
+        // Settings button
+        this.elements.settingsBtn.addEventListener('click', () => {
+            this.showSettings();
+        });
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.code === 'Space' && e.ctrlKey) {
@@ -73,7 +101,19 @@ class SpeechTranslator {
                 e.preventDefault();
                 this.swapLanguages();
             }
+            if (e.code === 'KeyT' && e.ctrlKey) {
+                e.preventDefault();
+                this.toggleTheme();
+            }
+            if (e.code === 'Escape') {
+                if (this.isRecording) {
+                    this.stopRecording();
+                }
+            }
         });
+
+        // Load saved theme preference
+        this.loadThemePreference();
     }
 
     // Initialize the application
@@ -122,6 +162,8 @@ class SpeechTranslator {
         this.isRecording = true;
         this.updateUI('recording');
         this.updateStatus('Recording started - Speak now');
+        this.updateStatusDot('recording');
+        this.showAudioVisualizer();
         
         // Placeholder: Actual speech recognition will be implemented in Part 3
         this.simulateRecording();
@@ -131,8 +173,17 @@ class SpeechTranslator {
     stopRecording() {
         console.log('Stopping recording...');
         this.isRecording = false;
-        this.updateUI('idle');
-        this.updateStatus('Recording stopped');
+        this.updateUI('processing');
+        this.updateStatus('Processing speech...');
+        this.updateStatusDot('processing');
+        this.hideAudioVisualizer();
+        
+        // Simulate processing time
+        setTimeout(() => {
+            this.updateUI('idle');
+            this.updateStatus('Ready to translate');
+            this.updateStatusDot('idle');
+        }, 1500);
     }
 
     // Simulate recording for testing (will be replaced in later parts)
@@ -140,9 +191,9 @@ class SpeechTranslator {
         // This is just for testing the UI - will be replaced with real speech recognition
         setTimeout(() => {
             if (this.isRecording) {
-                this.displayText('Hello, this is a test of the speech input display.', 'input');
+                this.displayText('Hello, this is a test of the enhanced speech input display with confidence scoring.', 'input', 0.87);
                 setTimeout(() => {
-                    this.displayText('Hola, esta es una prueba de la pantalla de entrada de voz.', 'output');
+                    this.displayText('Hola, esta es una prueba de la pantalla de entrada de voz mejorada con puntuación de confianza.', 'output');
                 }, 1000);
             }
         }, 2000);
@@ -175,13 +226,62 @@ class SpeechTranslator {
     }
 
     // Display text in input or output areas
-    displayText(text, area) {
+    displayText(text, area, confidence = null) {
         const targetElement = area === 'input' ? this.elements.speechInput : this.elements.translationOutput;
         
         // Remove placeholder and add text content
         targetElement.innerHTML = `<div class="text-content">${text}</div>`;
         
+        // Update confidence indicator for input
+        if (area === 'input' && confidence !== null) {
+            this.updateConfidenceIndicator(confidence);
+        }
+        
         console.log(`Displayed text in ${area}:`, text);
+    }
+
+    // Update confidence indicator
+    updateConfidenceIndicator(confidence) {
+        if (this.elements.confidenceText) {
+            const percentage = Math.round(confidence * 100);
+            this.elements.confidenceText.textContent = `${percentage}%`;
+            
+            // Update confidence color based on level
+            const indicator = this.elements.confidenceIndicator;
+            indicator.classList.remove('low', 'medium', 'high');
+            
+            if (confidence < 0.6) {
+                indicator.classList.add('low');
+            } else if (confidence < 0.8) {
+                indicator.classList.add('medium');
+            } else {
+                indicator.classList.add('high');
+            }
+        }
+    }
+
+    // Update status dot
+    updateStatusDot(state) {
+        const statusDot = this.elements.statusDot;
+        if (statusDot) {
+            statusDot.classList.remove('recording', 'processing');
+            if (state !== 'idle') {
+                statusDot.classList.add(state);
+            }
+        }
+    }
+
+    // Show/hide audio visualizer
+    showAudioVisualizer() {
+        if (this.elements.audioVisualizer) {
+            this.elements.audioVisualizer.classList.add('active');
+        }
+    }
+
+    hideAudioVisualizer() {
+        if (this.elements.audioVisualizer) {
+            this.elements.audioVisualizer.classList.remove('active');
+        }
     }
 
     // Update status message
@@ -286,6 +386,137 @@ class SpeechTranslator {
             isRecording: this.isRecording,
             browserSupport: this.checkBrowserSupport()
         };
+    }
+
+    // Theme management
+    toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('preferred-theme', newTheme);
+        
+        // Update theme toggle icon
+        const icon = this.elements.themeToggle.querySelector('i');
+        icon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        
+        this.updateStatus(`Switched to ${newTheme} theme`);
+    }
+
+    loadThemePreference() {
+        const savedTheme = localStorage.getItem('preferred-theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+        
+        document.documentElement.setAttribute('data-theme', theme);
+        
+        // Update theme toggle icon
+        const icon = this.elements.themeToggle?.querySelector('i');
+        if (icon) {
+            icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }
+    }
+
+    // Text-to-speech functionality
+    async speakText(area) {
+        const targetElement = area === 'input' ? this.elements.speechInput : this.elements.translationOutput;
+        const textContent = targetElement.querySelector('.text-content');
+        
+        if (!textContent) {
+            this.updateStatus('No text to speak');
+            return;
+        }
+
+        if ('speechSynthesis' in window) {
+            // Stop any ongoing speech
+            speechSynthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(textContent.textContent);
+            
+            // Set language based on area
+            if (area === 'output') {
+                utterance.lang = this.getLanguageCode(this.currentLanguages.target);
+            } else {
+                utterance.lang = this.currentLanguages.source;
+            }
+            
+            utterance.rate = 0.9;
+            utterance.pitch = 1;
+            
+            // Visual feedback
+            const button = this.elements.speakOutputBtn;
+            const originalIcon = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-stop"></i>';
+            
+            utterance.onend = () => {
+                button.innerHTML = originalIcon;
+                this.updateStatus('Finished speaking');
+            };
+            
+            utterance.onerror = () => {
+                button.innerHTML = originalIcon;
+                this.updateStatus('Speech synthesis failed');
+            };
+            
+            speechSynthesis.speak(utterance);
+            this.updateStatus('Speaking...');
+        } else {
+            this.updateStatus('Text-to-speech not supported in your browser');
+        }
+    }
+
+    // Get language code for speech synthesis
+    getLanguageCode(langCode) {
+        const langMap = {
+            'en': 'en-US',
+            'es': 'es-ES',
+            'fr': 'fr-FR',
+            'de': 'de-DE',
+            'it': 'it-IT',
+            'pt': 'pt-PT',
+            'zh': 'zh-CN',
+            'ja': 'ja-JP',
+            'ko': 'ko-KR',
+            'ar': 'ar-SA'
+        };
+        return langMap[langCode] || 'en-US';
+    }
+
+    // Clear all text
+    clearAllText() {
+        // Reset input area
+        this.elements.speechInput.innerHTML = `
+            <div class="placeholder-text">
+                <i class="fas fa-microphone-alt"></i>
+                <p>Your speech will appear here...</p>
+                <small>Supports: English, Spanish, French, German, and more</small>
+            </div>
+        `;
+        
+        // Reset output area
+        this.elements.translationOutput.innerHTML = `
+            <div class="placeholder-text">
+                <i class="fas fa-globe"></i>
+                <p>Translation will appear here...</p>
+                <small>Instant translation to your selected language</small>
+            </div>
+        `;
+        
+        // Reset confidence indicator
+        if (this.elements.confidenceText) {
+            this.elements.confidenceText.textContent = '--';
+        }
+        
+        this.updateStatus('All text cleared');
+    }
+
+    // Show settings (placeholder for future implementation)
+    showSettings() {
+        this.updateStatus('Settings panel - Coming in future updates');
+        console.log('Settings functionality will be added in later phases');
+        
+        // Placeholder for settings modal/panel
+        alert('Settings panel will be available in future updates!\n\nCurrent shortcuts:\n• Ctrl+Space: Toggle recording\n• Ctrl+S: Swap languages\n• Ctrl+T: Toggle theme\n• Esc: Stop recording');
     }
 }
 

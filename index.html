@@ -11,11 +11,18 @@
     <div class="container">
         <!-- Header -->
         <header class="header">
-            <h1 class="app-title">
-                <i class="fas fa-language"></i>
-                Real-Time Speech Translator
-            </h1>
-            <p class="app-subtitle">Speak in one language, see it translated instantly</p>
+            <div class="header-content">
+                <h1 class="app-title">
+                    <i class="fas fa-language"></i>
+                    Real-Time Speech Translator
+                </h1>
+                <p class="app-subtitle">Speak in one language, see it translated instantly</p>
+                
+                <!-- Theme Toggle -->
+                <button id="theme-toggle" class="theme-toggle" title="Toggle Dark/Light Theme" aria-label="Toggle Theme">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
         </header>
 
         <!-- Language Selection -->
@@ -63,12 +70,37 @@
         <main class="main-content">
             <!-- Audio Controls -->
             <section class="audio-controls">
-                <button id="mic-button" class="mic-button" title="Click to start speaking">
-                    <i class="fas fa-microphone"></i>
-                    <span class="mic-text">Click to Speak</span>
-                </button>
+                <div class="mic-container">
+                    <button id="mic-button" class="mic-button" title="Click to start speaking" aria-label="Start/Stop Recording">
+                        <i class="fas fa-microphone"></i>
+                        <span class="mic-text">Click to Speak</span>
+                    </button>
+                    
+                    <!-- Audio Visualizer -->
+                    <div class="audio-visualizer" id="audio-visualizer">
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                    </div>
+                </div>
+                
                 <div class="audio-status">
-                    <span id="status-text">Ready to translate</span>
+                    <div class="status-indicator">
+                        <span class="status-dot" id="status-dot"></span>
+                        <span id="status-text">Ready to translate</span>
+                    </div>
+                    
+                    <!-- Quick Actions -->
+                    <div class="quick-actions">
+                        <button class="quick-btn" id="clear-all" title="Clear all text" aria-label="Clear All Text">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                        <button class="quick-btn" id="settings-btn" title="Settings" aria-label="Settings">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                    </div>
                 </div>
             </section>
 
@@ -77,32 +109,57 @@
                 <!-- Speech Input Area -->
                 <div class="input-area">
                     <div class="area-header">
-                        <h3>What you're saying</h3>
-                        <button class="copy-btn" id="copy-input" title="Copy text">
-                            <i class="fas fa-copy"></i>
-                        </button>
+                        <h3><i class="fas fa-microphone-alt"></i> What you're saying</h3>
+                        <div class="header-actions">
+                            <span class="confidence-indicator" id="confidence-indicator" title="Recognition Confidence">
+                                <i class="fas fa-signal"></i>
+                                <span class="confidence-text">--</span>
+                            </span>
+                            <button class="copy-btn" id="copy-input" title="Copy text" aria-label="Copy Input Text">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="text-display" id="speech-input">
                         <div class="placeholder-text">
                             <i class="fas fa-microphone-alt"></i>
                             <p>Your speech will appear here...</p>
+                            <small>Supports: English, Spanish, French, German, and more</small>
                         </div>
+                    </div>
+                    <div class="area-footer">
+                        <small class="text-info">
+                            <i class="fas fa-info-circle"></i>
+                            Press <kbd>Ctrl + Space</kbd> to start/stop recording
+                        </small>
                     </div>
                 </div>
 
                 <!-- Translation Output Area -->
                 <div class="output-area">
                     <div class="area-header">
-                        <h3>Translation</h3>
-                        <button class="copy-btn" id="copy-output" title="Copy translation">
-                            <i class="fas fa-copy"></i>
-                        </button>
+                        <h3><i class="fas fa-globe"></i> Translation</h3>
+                        <div class="header-actions">
+                            <button class="speak-btn" id="speak-output" title="Read translation aloud" aria-label="Speak Translation">
+                                <i class="fas fa-volume-up"></i>
+                            </button>
+                            <button class="copy-btn" id="copy-output" title="Copy translation" aria-label="Copy Translation">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="text-display" id="translation-output">
                         <div class="placeholder-text">
                             <i class="fas fa-globe"></i>
                             <p>Translation will appear here...</p>
+                            <small>Instant translation to your selected language</small>
                         </div>
+                    </div>
+                    <div class="area-footer">
+                        <small class="text-info">
+                            <i class="fas fa-magic"></i>
+                            Powered by advanced translation AI
+                        </small>
                     </div>
                 </div>
             </section>
