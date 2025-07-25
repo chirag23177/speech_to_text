@@ -6,6 +6,9 @@ class SpeechTranslator {
         this.isRecording = false;
         this.recognition = null;
         this.mediaStream = null;
+        this.audioContext = null;
+        this.analyser = null;
+        this.animationFrame = null;
         this.permissionStatus = 'unknown'; // 'granted', 'denied', 'prompt', 'unknown'
         this.currentLanguages = {
             source: 'en-US',
@@ -114,6 +117,18 @@ class SpeechTranslator {
             }
         });
 
+        // Part 2.2: Clean up audio stream on page unload
+        window.addEventListener('beforeunload', () => {
+            this.cleanupAudioStream();
+        });
+
+        // Part 2.2: Clean up audio stream when page becomes hidden
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && this.isRecording) {
+                this.stopRecording();
+            }
+        });
+
         // Load saved theme preference
         this.loadThemePreference();
     }
@@ -201,7 +216,7 @@ class SpeechTranslator {
     async requestMicrophoneAccess() {
         try {
             this.updateStatus('Requesting microphone access...');
-            console.log('Requesting microphone access...');
+            console.log('🎤 Requesting microphone access...');
             
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 audio: {
@@ -212,7 +227,27 @@ class SpeechTranslator {
             
             this.mediaStream = stream;
             this.permissionStatus = 'granted';
-            console.log('Microphone access granted');
+            
+            // Debug: Log stream details
+            console.log('✅ Microphone access granted');
+            console.log('📊 MediaStream details:', {
+                id: stream.id,
+                active: stream.active,
+                tracks: stream.getTracks().length
+            });
+            
+            // Debug: Log audio track details
+            const audioTracks = stream.getAudioTracks();
+            if (audioTracks.length > 0) {
+                console.log('🔊 Audio track details:', {
+                    label: audioTracks[0].label,
+                    enabled: audioTracks[0].enabled,
+                    muted: audioTracks[0].muted,
+                    readyState: audioTracks[0].readyState
+                });
+            } else {
+                console.warn('⚠️ No audio tracks found in stream');
+            }
             
             this.updateStatus('Microphone access granted - Ready to translate');
             this.updatePermissionUI();
@@ -246,7 +281,7 @@ class SpeechTranslator {
         this.updatePermissionUI();
     }
 
-    // Toggle recording state
+    // Part 2.2: Enhanced Audio Stream Management
     toggleRecording() {
         if (this.isRecording) {
             this.stopRecording();
@@ -255,45 +290,397 @@ class SpeechTranslator {
         }
     }
 
-    // Start recording (enhanced with microphone access)
+    // Enhanced start recording with audio analysis
     async startRecording() {
-        console.log('Starting recording...');
+        if (this.isRecording) return;
         
-        // Part 2.1: Check for microphone access
-        if (!this.mediaStream || !this.mediaStream.active) {
-            const accessGranted = await this.requestMicrophoneAccess();
-            if (!accessGranted) {
-                return;
+        try {
+            // Request microphone access if we don't have it
+            if (!this.mediaStream || !this.mediaStream.active) {
+                const accessGranted = await this.requestMicrophoneAccess();
+                if (!accessGranted) {
+                    return;
+                }
             }
+            
+            // CRITICAL: Set recording state FIRST before starting audio analysis
+            this.isRecording = true;
+            
+            // Start audio analysis for visualization
+            await this.startAudioAnalysis();
+            
+            // Update UI state
+            this.updateUI('recording');
+            this.updateStatus('🎤 Recording... Speak now!');
+            this.updateStatusDot('recording');
+            this.showRecordingFeedback();
+            
+            // Add pulsing animation to mic button
+            this.elements.micButton.classList.add('recording');
+            
+            console.log('Recording started successfully');
+            
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            this.handleMicrophoneError(error);
+        }
+    }
+    
+    // Enhanced stop recording with proper cleanup
+    stopRecording() {
+        if (!this.isRecording) return;
+        
+        console.log('Stopping recording...');
+        
+        try {
+            // Stop audio analysis
+            this.stopAudioAnalysis();
+            
+            // Update UI state
+            this.isRecording = false;
+            this.updateUI('processing');
+            this.updateStatus('Processing speech...');
+            this.updateStatusDot('processing');
+            this.hideRecordingFeedback();
+            
+            // Remove pulsing animation
+            this.elements.micButton.classList.remove('recording');
+            
+            console.log('Recording stopped successfully');
+            
+            // Simulate processing time
+            setTimeout(() => {
+                this.updateUI('idle');
+                this.updateStatus('Ready to translate');
+                this.updateStatusDot('idle');
+            }, 1500);
+            
+        } catch (error) {
+            console.error('Error stopping recording:', error);
+        }
+    }
+    
+    // Part 2.2: Start audio analysis for visualization
+    async startAudioAnalysis() {
+        if (!this.mediaStream) {
+            console.error('❌ Cannot start audio analysis: No media stream available');
+            return;
         }
         
-        this.isRecording = true;
-        this.updateUI('recording');
-        this.updateStatus('Recording started - Speak now');
-        this.updateStatusDot('recording');
+        try {
+            // Create audio context and analyser
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            this.analyser = this.audioContext.createAnalyser();
+            this.analyser.fftSize = 256;
+            this.analyser.smoothingTimeConstant = 0.8;
+            
+            // Connect audio stream to analyser
+            const source = this.audioContext.createMediaStreamSource(this.mediaStream);
+            source.connect(this.analyser);
+            
+            // Start audio level visualization
+            this.visualizeAudioLevel();
+            
+            console.log('✅ Audio analysis started successfully');
+            
+        } catch (error) {
+            console.error('❌ Error setting up audio analysis:', error);
+        }
+    }
+    
+    // Part 2.2: Stop audio analysis
+    stopAudioAnalysis() {
+        // Cancel animation frame
+        if (this.animationFrame) {
+            cancelAnimationFrame(this.animationFrame);
+            this.animationFrame = null;
+        }
+        
+        // Close audio context
+        if (this.audioContext && this.audioContext.state !== 'closed') {
+            this.audioContext.close();
+            this.audioContext = null;
+        }
+        
+        this.analyser = null;
+        
+        // Reset visualizer
+        this.resetAudioVisualizer();
+        
+        console.log('Audio analysis stopped');
+    }
+    
+    // Part 2.2: Real-time audio level visualization
+    visualizeAudioLevel() {
+        if (!this.analyser) {
+            console.error('❌ Cannot visualize audio: No analyser available');
+            return;
+        }
+        
+        if (!this.isRecording) {
+            console.error('❌ Cannot visualize audio: Not recording');
+            return;
+        }
+        
+        const bufferLength = this.analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        
+        let frameCount = 0;
+        const logInterval = 300; // Log every 300 frames (roughly every 5 seconds at 60fps)
+        
+        // Store reference to this for closure
+        const self = this;
+        
+        const animate = () => {
+            // Check if we should continue
+            if (!self.isRecording) {
+                self.animationFrame = null;
+                return;
+            }
+            
+            // Set animation frame ID to track active state
+            self.animationFrame = requestAnimationFrame(animate);
+            
+            // Get audio data from analyser
+            self.analyser.getByteFrequencyData(dataArray);
+            
+            // Calculate average audio level
+            let sum = 0;
+            let maxValue = 0;
+            let nonZeroCount = 0;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                sum += dataArray[i];
+                maxValue = Math.max(maxValue, dataArray[i]);
+                if (dataArray[i] > 0) nonZeroCount++;
+            }
+            
+            const average = sum / bufferLength;
+            const normalizedLevel = Math.min(average / 128, 1); // Normalize to 0-1
+            
+            // Minimal logging for critical issues only
+            frameCount++;
+            if (frameCount % logInterval === 0) {
+                if (sum === 0) {
+                    console.warn('⚠️ No audio data detected - check microphone');
+                }
+            }
+            
+            // Update visualizer bars
+            self.updateAudioVisualizer(normalizedLevel);
+            
+            // Update mic button intensity
+            self.updateMicButtonIntensity(normalizedLevel);
+        };
+        
+        // Start the animation loop
+        animate();
+    }
+    
+    // Part 2.2: Update audio visualizer bars
+    updateAudioVisualizer(level) {
+        const visualizerBars = document.querySelectorAll('.visualizer-bar');
+        if (visualizerBars.length === 0) {
+            console.warn('⚠️ No visualizer bars found in DOM');
+            return;
+        }
+        
+        const activeBarCount = Math.floor(level * visualizerBars.length);
+        
+        visualizerBars.forEach((bar, index) => {
+            if (index < activeBarCount) {
+                bar.classList.add('active');
+                bar.style.opacity = Math.max(0.4, level);
+                bar.style.transform = `scaleY(${0.3 + level * 0.7})`;
+            } else {
+                bar.classList.remove('active');
+                bar.style.opacity = '0.2';
+                bar.style.transform = 'scaleY(0.3)';
+            }
+        });
+    }
+    
+    // Part 2.2: Update mic button intensity based on audio level
+    updateMicButtonIntensity(level) {
+        if (this.elements.micButton && this.isRecording) {
+            // Adjust button opacity and scale based on audio level
+            const intensity = 0.8 + (level * 0.2); // Range from 0.8 to 1.0
+            const scale = 1 + (level * 0.05); // Slight scale effect
+            
+            this.elements.micButton.style.opacity = intensity;
+            this.elements.micButton.style.transform = `scale(${scale})`;
+        }
+    }
+    
+    // Part 2.2: Reset audio visualizer to default state
+    resetAudioVisualizer() {
+        const visualizerBars = document.querySelectorAll('.visualizer-bar');
+        visualizerBars.forEach(bar => {
+            bar.classList.remove('active');
+            bar.style.opacity = '0.2';
+            bar.style.transform = 'scaleY(0.3)';
+        });
+        
+        // Reset mic button
+        if (this.elements.micButton) {
+            this.elements.micButton.style.opacity = '';
+            this.elements.micButton.style.transform = '';
+        }
+    }
+    
+    // Part 2.2: Show recording feedback UI
+    showRecordingFeedback() {
+        // Show confidence indicator as recording indicator
+        if (this.elements.confidence) {
+            this.elements.confidence.style.display = 'block';
+            this.elements.confidence.textContent = '🔴 REC';
+            this.elements.confidence.style.color = '#ff4444';
+            this.elements.confidence.style.fontWeight = 'bold';
+        }
+        
+        // Show audio visualizer
         this.showAudioVisualizer();
+    }
+    
+    // Part 2.2: Hide recording feedback UI
+    hideRecordingFeedback() {
+        // Hide recording indicator
+        if (this.elements.confidence) {
+            this.elements.confidence.style.display = 'none';
+            this.elements.confidence.style.color = '';
+            this.elements.confidence.style.fontWeight = '';
+        }
         
-        console.log('Recording started with microphone access');
+        // Hide audio visualizer
+        this.hideAudioVisualizer();
+    }
+    
+    // Part 2.2: Clean up audio stream and resources
+    cleanupAudioStream() {
+        console.log('Cleaning up audio stream...');
         
-        // Placeholder: Actual speech recognition will be implemented in Part 3
-        this.simulateRecording();
+        // Stop recording if active
+        if (this.isRecording) {
+            this.stopRecording();
+        }
+        
+        // Stop audio analysis
+        this.stopAudioAnalysis();
+        
+        // Stop all tracks in the media stream
+        if (this.mediaStream) {
+            this.mediaStream.getTracks().forEach(track => {
+                track.stop();
+                console.log('Stopped audio track:', track.kind);
+            });
+            this.mediaStream = null;
+        }
+        
+        // Reset UI state
+        this.updateUI('idle');
+        this.updateStatus('Ready to translate');
+        this.updateStatusDot('idle');
+        this.hideRecordingFeedback();
+        
+        console.log('Audio stream cleanup completed');
     }
 
-    // Stop recording (enhanced with proper cleanup)
-    stopRecording() {
-        console.log('Stopping recording...');
-        this.isRecording = false;
-        this.updateUI('processing');
-        this.updateStatus('Processing speech...');
-        this.updateStatusDot('processing');
-        this.hideAudioVisualizer();
+    // Part 2.2: Debug method for manual console testing
+    debugAudioStream() {
+        console.log('🔍 AUDIO STREAM DEBUG REPORT');
+        console.log('================================');
         
-        // Simulate processing time
-        setTimeout(() => {
-            this.updateUI('idle');
-            this.updateStatus('Ready to translate');
-            this.updateStatusDot('idle');
-        }, 1500);
+        // Check media stream
+        if (this.mediaStream) {
+            console.log('✅ MediaStream Status:', {
+                id: this.mediaStream.id,
+                active: this.mediaStream.active,
+                tracks: this.mediaStream.getTracks().length
+            });
+            
+            const audioTracks = this.mediaStream.getAudioTracks();
+            audioTracks.forEach((track, index) => {
+                console.log(`🎵 Audio Track ${index}:`, {
+                    label: track.label,
+                    enabled: track.enabled,
+                    muted: track.muted,
+                    readyState: track.readyState,
+                    kind: track.kind
+                });
+            });
+        } else {
+            console.log('❌ MediaStream: Not available');
+        }
+        
+        // Check audio context
+        if (this.audioContext) {
+            console.log('✅ AudioContext Status:', {
+                state: this.audioContext.state,
+                sampleRate: this.audioContext.sampleRate,
+                currentTime: this.audioContext.currentTime
+            });
+        } else {
+            console.log('❌ AudioContext: Not available');
+        }
+        
+        // Check analyser
+        if (this.analyser) {
+            console.log('✅ AnalyserNode Status:', {
+                fftSize: this.analyser.fftSize,
+                frequencyBinCount: this.analyser.frequencyBinCount,
+                smoothingTimeConstant: this.analyser.smoothingTimeConstant
+            });
+            
+            // Test audio data
+            const bufferLength = this.analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            this.analyser.getByteFrequencyData(dataArray);
+            
+            const sum = dataArray.reduce((a, b) => a + b, 0);
+            const max = Math.max(...dataArray);
+            
+            console.log('📊 Current Audio Data:', {
+                bufferLength,
+                sum,
+                average: sum / bufferLength,
+                max,
+                firstTenValues: Array.from(dataArray.slice(0, 10))
+            });
+            
+            if (sum === 0) {
+                console.warn('⚠️ ISSUE: No audio data detected - all values are zero');
+                console.log('💡 Possible causes:');
+                console.log('   - Microphone is muted or not working');
+                console.log('   - MediaStream not properly connected to AudioContext');
+                console.log('   - Audio track is disabled or muted');
+            }
+        } else {
+            console.log('❌ AnalyserNode: Not available');
+        }
+        
+        // Check DOM elements
+        const visualizerBars = document.querySelectorAll('.visualizer-bar');
+        console.log('🎛️ Visualizer Bars:', {
+            found: visualizerBars.length,
+            expected: 7
+        });
+        
+        // Check recording state
+        console.log('🎤 Recording State:', {
+            isRecording: this.isRecording,
+            animationFrameActive: this.animationFrame !== null,
+            animationFrameId: this.animationFrame
+        });
+        
+        console.log('================================');
+        
+        return {
+            hasStream: !!this.mediaStream,
+            hasAudioContext: !!this.audioContext,
+            hasAnalyser: !!this.analyser,
+            isRecording: this.isRecording,
+            visualizerBars: visualizerBars.length
+        };
     }
 
     // Simulate recording for testing (will be replaced in later parts)
@@ -653,9 +1040,16 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Initializing Speech Translator...');
     window.speechTranslator = new SpeechTranslator();
     
+    // Make debug method easily accessible
+    window.debugAudio = () => window.speechTranslator.debugAudioStream();
+    
     // Add keyboard shortcut hints to the UI
     const statusElement = document.getElementById('status-text');
     statusElement.title = 'Keyboard shortcuts: Ctrl+Space (toggle recording), Ctrl+S (swap languages), Ctrl+T (toggle theme)';
+    
+    console.log('💡 Debug commands available:');
+    console.log('   - debugAudio() - Check audio stream status');
+    console.log('   - speechTranslator - Access main translator object');
 });
 
 // Export for testing purposes
