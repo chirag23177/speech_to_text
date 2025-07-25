@@ -1,10 +1,12 @@
 // Real-Time Speech Translator - Main Application
-// Part 1.1: Basic Project Structure and UI Setup
+// Part 1.2 + Part 2.1: Enhanced UI with Microphone Permission & Access
 
 class SpeechTranslator {
     constructor() {
         this.isRecording = false;
         this.recognition = null;
+        this.mediaStream = null;
+        this.permissionStatus = 'unknown'; // 'granted', 'denied', 'prompt', 'unknown'
         this.currentLanguages = {
             source: 'en-US',
             target: 'es'
@@ -120,6 +122,7 @@ class SpeechTranslator {
     initializeApp() {
         this.updateStatus('Application initialized - Ready to translate');
         this.checkBrowserSupport();
+        this.checkMicrophonePermission();
         console.log('Speech Translator initialized successfully');
     }
 
@@ -147,6 +150,102 @@ class SpeechTranslator {
         return true;
     }
 
+    // Part 2.1: Check microphone permission status
+    async checkMicrophonePermission() {
+        try {
+            if ('permissions' in navigator) {
+                const permission = await navigator.permissions.query({ name: 'microphone' });
+                this.permissionStatus = permission.state;
+                console.log('Microphone permission status:', permission.state);
+                
+                // Listen for permission changes
+                permission.addEventListener('change', () => {
+                    this.permissionStatus = permission.state;
+                    this.updatePermissionUI();
+                });
+                
+                this.updatePermissionUI();
+            } else {
+                // Fallback for browsers without Permissions API
+                this.updateStatus('Ready to translate - Click microphone to start');
+            }
+        } catch (error) {
+            console.warn('Could not check microphone permission:', error);
+            this.updateStatus('Ready to translate - Click microphone to start');
+        }
+    }
+
+    // Part 2.1: Update UI based on permission status
+    updatePermissionUI() {
+        switch (this.permissionStatus) {
+            case 'granted':
+                this.updateStatus('Microphone access granted - Ready to translate');
+                this.elements.micButton.disabled = false;
+                break;
+            case 'denied':
+                this.updateStatus('Microphone access denied - Please enable in browser settings');
+                this.elements.micButton.disabled = true;
+                break;
+            case 'prompt':
+                this.updateStatus('Click microphone to grant access');
+                this.elements.micButton.disabled = false;
+                break;
+            default:
+                this.updateStatus('Ready to translate - Click microphone to start');
+                this.elements.micButton.disabled = false;
+                break;
+        }
+    }
+
+    // Part 2.1: Request microphone access
+    async requestMicrophoneAccess() {
+        try {
+            this.updateStatus('Requesting microphone access...');
+            console.log('Requesting microphone access...');
+            
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true
+                }
+            });
+            
+            this.mediaStream = stream;
+            this.permissionStatus = 'granted';
+            console.log('Microphone access granted');
+            
+            this.updateStatus('Microphone access granted - Ready to translate');
+            this.updatePermissionUI();
+            
+            return true;
+            
+        } catch (error) {
+            console.error('Microphone access error:', error);
+            this.handleMicrophoneError(error);
+            return false;
+        }
+    }
+
+    // Part 2.1: Handle microphone errors
+    handleMicrophoneError(error) {
+        switch (error.name) {
+            case 'NotAllowedError':
+                this.permissionStatus = 'denied';
+                this.updateStatus('Microphone access denied - Please allow microphone access');
+                break;
+            case 'NotFoundError':
+                this.updateStatus('No microphone found - Please connect a microphone');
+                break;
+            case 'NotReadableError':
+                this.updateStatus('Microphone is busy - Close other apps using microphone');
+                break;
+            default:
+                this.updateStatus('Microphone error - Please try again');
+                break;
+        }
+        this.updatePermissionUI();
+    }
+
     // Toggle recording state
     toggleRecording() {
         if (this.isRecording) {
@@ -156,20 +255,31 @@ class SpeechTranslator {
         }
     }
 
-    // Start recording (placeholder for Part 2)
-    startRecording() {
+    // Start recording (enhanced with microphone access)
+    async startRecording() {
         console.log('Starting recording...');
+        
+        // Part 2.1: Check for microphone access
+        if (!this.mediaStream || !this.mediaStream.active) {
+            const accessGranted = await this.requestMicrophoneAccess();
+            if (!accessGranted) {
+                return;
+            }
+        }
+        
         this.isRecording = true;
         this.updateUI('recording');
         this.updateStatus('Recording started - Speak now');
         this.updateStatusDot('recording');
         this.showAudioVisualizer();
         
+        console.log('Recording started with microphone access');
+        
         // Placeholder: Actual speech recognition will be implemented in Part 3
         this.simulateRecording();
     }
 
-    // Stop recording (placeholder for Part 2)
+    // Stop recording (enhanced with proper cleanup)
     stopRecording() {
         console.log('Stopping recording...');
         this.isRecording = false;
@@ -379,15 +489,6 @@ class SpeechTranslator {
         this.elements.loadingOverlay.classList.add('hidden');
     }
 
-    // Get current configuration
-    getConfiguration() {
-        return {
-            languages: this.currentLanguages,
-            isRecording: this.isRecording,
-            browserSupport: this.checkBrowserSupport()
-        };
-    }
-
     // Theme management
     toggleTheme() {
         const currentTheme = document.documentElement.getAttribute('data-theme');
@@ -510,13 +611,40 @@ class SpeechTranslator {
         this.updateStatus('All text cleared');
     }
 
-    // Show settings (placeholder for future implementation)
+    // Show settings (enhanced with microphone info)
     showSettings() {
-        this.updateStatus('Settings panel - Coming in future updates');
-        console.log('Settings functionality will be added in later phases');
+        const permissionInfo = `Microphone permission: ${this.permissionStatus}`;
+        const streamInfo = this.mediaStream ? 'Microphone stream: Active' : 'Microphone stream: Inactive';
         
-        // Placeholder for settings modal/panel
-        alert('Settings panel will be available in future updates!\n\nCurrent shortcuts:\n• Ctrl+Space: Toggle recording\n• Ctrl+S: Swap languages\n• Ctrl+T: Toggle theme\n• Esc: Stop recording');
+        const settingsInfo = [
+            'Speech Translator Settings',
+            '',
+            '🎤 Microphone Status:',
+            `• ${permissionInfo}`,
+            `• ${streamInfo}`,
+            '',
+            '⌨️ Keyboard Shortcuts:',
+            '• Ctrl+Space: Toggle recording',
+            '• Ctrl+S: Swap languages', 
+            '• Ctrl+T: Toggle theme',
+            '• Esc: Stop recording'
+        ].join('\n');
+        
+        console.log('Settings info:', settingsInfo);
+        alert(settingsInfo);
+        
+        this.updateStatus('Settings displayed');
+    }
+
+    // Get current configuration
+    getConfiguration() {
+        return {
+            languages: this.currentLanguages,
+            isRecording: this.isRecording,
+            permissionStatus: this.permissionStatus,
+            hasMediaStream: !!this.mediaStream,
+            browserSupport: this.checkBrowserSupport()
+        };
     }
 }
 
@@ -527,7 +655,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Add keyboard shortcut hints to the UI
     const statusElement = document.getElementById('status-text');
-    statusElement.title = 'Keyboard shortcuts: Ctrl+Space (toggle recording), Ctrl+S (swap languages)';
+    statusElement.title = 'Keyboard shortcuts: Ctrl+Space (toggle recording), Ctrl+S (swap languages), Ctrl+T (toggle theme)';
 });
 
 // Export for testing purposes
