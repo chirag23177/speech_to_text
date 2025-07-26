@@ -868,6 +868,16 @@ class SpeechTranslator {
         this.recognition.onaudioend = () => {
             console.log('🔇 Speech recognition audio ended');
         };
+
+        // Handle speech start
+        this.recognition.onspeechstart = () => {
+            console.log('🗣️ Speech detection started');
+        };
+
+        // Handle speech end
+        this.recognition.onspeechend = () => {
+            console.log('🤐 Speech detection ended');
+        };
     }
 
     // Part 3.1: Start speech recognition
