@@ -138,6 +138,24 @@ class SpeechTranslator {
             }
         });
 
+        // Manual text input for speech input area
+        this.elements.speechInput.addEventListener('input', (e) => {
+            this.handleManualTextInput(e);
+        });
+
+        this.elements.speechInput.addEventListener('focus', (e) => {
+            if (e.target.contentEditable === 'true') {
+                e.target.classList.add('editing');
+            }
+        });
+
+        this.elements.speechInput.addEventListener('blur', (e) => {
+            if (e.target.contentEditable === 'true') {
+                e.target.classList.remove('editing');
+                this.handleManualTextComplete(e);
+            }
+        });
+
         // Load saved theme preference
         this.loadThemePreference();
     }
@@ -343,6 +361,73 @@ class SpeechTranslator {
                 notification.style.opacity = '0.7';
             }
         }, 10000);
+    }
+
+    // Show network error guidance to user
+    showNetworkErrorGuidance() {
+        // Create notification element if it doesn't exist
+        let notification = document.getElementById('network-error-notification');
+        if (!notification) {
+            notification = document.createElement('div');
+            notification.id = 'network-error-notification';
+            notification.className = 'security-notification error-notification';
+            
+            // Insert after header
+            const header = document.querySelector('.header');
+            if (header && header.nextSibling) {
+                header.parentNode.insertBefore(notification, header.nextSibling);
+            } else {
+                document.body.appendChild(notification);
+            }
+        }
+
+        // Set notification content
+        notification.innerHTML = `
+            <div class="notification-content">
+                <div class="notification-header">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Speech Recognition API Unavailable</strong>
+                    <button class="notification-close" onclick="this.parentElement.parentElement.parentElement.style.display='none'">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="notification-body">
+                    <p>Google's Speech Recognition API is currently unavailable. This is a common issue with the Web Speech API.</p>
+                    <div class="notification-suggestions">
+                        <strong>Possible Solutions:</strong>
+                        <ul>
+                            <li>Try again in a few minutes (API rate limiting)</li>
+                            <li>Use manual text input in the speech box</li>
+                            <li>Check if you're on a corporate/school network (may block the API)</li>
+                            <li>Try a different browser or incognito mode</li>
+                            <li>Clear browser cache and cookies</li>
+                        </ul>
+                    </div>
+                    <div class="notification-suggestions">
+                        <strong>Alternative Text Input:</strong>
+                        <ul>
+                            <li>Click in the "What you're saying" box below</li>
+                            <li>Type your text manually</li>
+                            <li>Use the translation feature normally</li>
+                        </ul>
+                    </div>
+                    <small class="notification-note">
+                        <i class="fas fa-info-circle"></i>
+                        This is a Google API limitation, not an issue with your setup. Audio recording works perfectly.
+                    </small>
+                </div>
+            </div>
+        `;
+
+        // Show notification
+        notification.style.display = 'block';
+        
+        // Auto-hide after 15 seconds
+        setTimeout(() => {
+            if (notification && notification.style.display !== 'none') {
+                notification.style.opacity = '0.8';
+            }
+        }, 15000);
     }
 
     // Part 2.1: Check microphone permission status
@@ -1051,7 +1136,7 @@ class SpeechTranslator {
         const speechInput = this.elements.speechInput;
         speechInput.classList.remove('has-content');
         
-        if (this.recognitionSupported) {
+        if (this.recognitionSupported && !this.speechRecognitionFailed) {
             speechInput.innerHTML = `
                 <div class="placeholder-text">
                     <i class="fas fa-microphone-alt"></i>
@@ -1059,6 +1144,17 @@ class SpeechTranslator {
                     <small>Supports: English, Spanish, French, German, and more</small>
                 </div>
             `;
+            speechInput.contentEditable = false;
+        } else if (this.speechRecognitionFailed) {
+            speechInput.innerHTML = `
+                <div class="placeholder-text editable-hint">
+                    <i class="fas fa-edit"></i>
+                    <p>Speech recognition unavailable - Click here to type manually</p>
+                    <small>You can type your text directly in this box</small>
+                </div>
+            `;
+            speechInput.contentEditable = true;
+            speechInput.setAttribute('data-placeholder', 'Type your text here...');
         } else {
             speechInput.innerHTML = `
                 <div class="placeholder-text">
@@ -1067,6 +1163,41 @@ class SpeechTranslator {
                     <small>Speech recognition requires HTTPS - audio visualization works normally</small>
                 </div>
             `;
+            speechInput.contentEditable = false;
+        }
+    }
+
+    // Handle manual text input when speech recognition fails
+    handleManualTextInput(event) {
+        const target = event.target;
+        const text = target.textContent.trim();
+        
+        if (text) {
+            target.classList.add('has-content');
+            this.finalTranscript = text;
+            this.updateStatus(`Manual input: ${text.length} characters`);
+        } else {
+            target.classList.remove('has-content');
+            this.finalTranscript = '';
+        }
+    }
+
+    // Handle completion of manual text input
+    handleManualTextComplete(event) {
+        const target = event.target;
+        const text = target.textContent.trim();
+        
+        if (text) {
+            this.finalTranscript = text;
+            this.updateStatus(`Text ready for translation (${text.length} characters)`);
+            
+            // Style as final text
+            target.innerHTML = `<span class="final-text">${text}</span>`;
+            target.classList.add('has-content');
+            
+            console.log('Manual text input completed:', text);
+        } else {
+            this.showSpeechPlaceholder();
         }
     }
 
@@ -1123,12 +1254,17 @@ class SpeechTranslator {
                     this.handleInsecureContext(secureContext);
                 } else {
                     // HTTPS environment but still getting network error
-                    this.updateStatus('❌ Speech service temporarily unavailable - click microphone to retry');
-                }
-                
-                // Don't disable recognition immediately in HTTPS - allow retry
-                if (!secureContext.isSecure) {
-                    this.recognitionSupported = false;
+                    console.warn('🚨 Google Speech API network error detected');
+                    console.warn('💡 Common causes:');
+                    console.warn('   • API quota exceeded or rate limited');
+                    console.warn('   • Regional restrictions on the API');
+                    console.warn('   • Firewall/corporate network blocking');
+                    console.warn('   • Temporary Google service outage');
+                    
+                    this.updateStatus('❌ Google Speech API unavailable - Try manual text input');
+                    
+                    // Show helpful message to user
+                    this.showNetworkErrorGuidance();
                 }
                 break;
                 

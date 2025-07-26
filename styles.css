@@ -563,6 +563,55 @@ body {
     opacity: 0.7;
 }
 
+/* Editable speech input styling */
+.placeholder-text.editable-hint {
+    cursor: text;
+    transition: all 0.3s ease;
+}
+
+.placeholder-text.editable-hint:hover {
+    background: rgba(var(--accent-color-rgb), 0.1);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+.placeholder-text.editable-hint i {
+    color: #4CAF50;
+}
+
+/* Content editable speech input */
+#speech-input[contenteditable="true"] {
+    min-height: 100px;
+    outline: none;
+    cursor: text;
+}
+
+#speech-input[contenteditable="true"]:focus .placeholder-text {
+    display: none;
+}
+
+#speech-input[contenteditable="true"]:empty:before {
+    content: attr(data-placeholder);
+    color: var(--text-muted);
+    font-style: italic;
+    opacity: 0.7;
+}
+
+#speech-input[contenteditable="true"]:focus:empty:before {
+    opacity: 0.5;
+}
+
+#speech-input.editing {
+    border: 2px solid var(--accent-color);
+    background: rgba(var(--accent-color-rgb), 0.05);
+}
+
+#speech-input.has-content {
+    padding: 1.5rem;
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
 /* Speech recognition text styling */
 .final-text {
     color: var(--text-primary);
@@ -672,6 +721,13 @@ kbd {
     margin: 1rem 0;
     backdrop-filter: blur(10px);
     animation: slideInDown 0.5s ease;
+}
+
+/* Error notification variant */
+.security-notification.error-notification {
+    background: linear-gradient(135deg, rgba(255, 87, 51, 0.15), rgba(255, 152, 0, 0.15));
+    border: 1px solid rgba(255, 87, 51, 0.3);
+    border-left: 4px solid #ff5733;
 }
 
 .notification-content {
