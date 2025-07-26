@@ -809,20 +809,51 @@ class SpeechTranslator {
     configureSpeechRecognition() {
         if (!this.recognition) return;
 
-        // Basic configuration
-        this.recognition.continuous = true;           // Keep listening continuously
-        this.recognition.interimResults = true;      // Get interim results as user speaks
-        this.recognition.maxAlternatives = 1;        // Only need the best result
-        // this.recognition.grammars = null;            // No specific grammar constraints
+        try {
+            // Basic configuration
+            this.recognition.continuous = true;           // Keep listening continuously
+            this.recognition.interimResults = true;      // Get interim results as user speaks
+            this.recognition.maxAlternatives = 1;        // Only need the best result
+            
+            // Validate and set language
+            const language = this.validateLanguageCode(this.currentLanguages.source);
+            this.recognition.lang = language;
 
-        // Set language based on current source language
-        this.recognition.lang = this.currentLanguages.source;
+            console.log('✅ Speech recognition configured:', {
+                requestedLanguage: this.currentLanguages.source,
+                actualLanguage: language,
+                continuous: this.recognition.continuous,
+                interimResults: this.recognition.interimResults,
+                maxAlternatives: this.recognition.maxAlternatives
+            });
+        } catch (error) {
+            console.error('❌ Error configuring speech recognition:', error);
+        }
+    }
 
-        console.log('✅ Speech recognition configured:', {
-            language: this.recognition.lang,
-            continuous: this.recognition.continuous,
-            interimResults: this.recognition.interimResults
-        });
+    // Validate language code for speech recognition
+    validateLanguageCode(langCode) {
+        // Common language codes that work well with speech recognition
+        const supportedLanguages = {
+            'en-US': 'en-US',
+            'es-ES': 'es-ES', 
+            'fr-FR': 'fr-FR',
+            'de-DE': 'de-DE',
+            'it-IT': 'it-IT',
+            'pt-PT': 'pt-PT',
+            'zh-CN': 'zh-CN',
+            'ja-JP': 'ja-JP',
+            'ko-KR': 'ko-KR',
+            'ar-SA': 'ar-SA'
+        };
+
+        const validatedLang = supportedLanguages[langCode];
+        if (!validatedLang) {
+            console.warn(`⚠️ Language ${langCode} not in supported list, falling back to en-US`);
+            return 'en-US';
+        }
+
+        return validatedLang;
     }
 
     // Part 3.1: Set up speech recognition event handlers
@@ -831,24 +862,34 @@ class SpeechTranslator {
 
         // Handle successful results
         this.recognition.onresult = (event) => {
+            console.log('🎯 Speech recognition result event fired:', {
+                resultIndex: event.resultIndex,
+                resultsLength: event.results.length,
+                timestamp: new Date().toISOString()
+            });
             this.handleSpeechResults(event);
         };
 
         // Handle errors
         this.recognition.onerror = (event) => {
+            console.error('🚨 Speech recognition error event:', {
+                error: event.error,
+                message: event.message,
+                timestamp: new Date().toISOString()
+            });
             this.handleSpeechError(event);
         };
 
         // Handle recognition start
         this.recognition.onstart = () => {
             this.recognitionActive = true;
-            console.log('🎤 Speech recognition started');
+            console.log('🎤 Speech recognition started at', new Date().toISOString());
         };
 
         // Handle recognition end
         this.recognition.onend = () => {
             this.recognitionActive = false;
-            console.log('🛑 Speech recognition ended');
+            console.log('🛑 Speech recognition ended at', new Date().toISOString());
             
             // Restart if we're still recording
             if (this.isRecording && this.recognitionSupported) {
@@ -871,12 +912,28 @@ class SpeechTranslator {
 
         // Handle speech start
         this.recognition.onspeechstart = () => {
-            console.log('🗣️ Speech detection started');
+            console.log('🗣️ Speech detection started - user is speaking');
+            this.updateStatus('🗣️ Speech detected - keep talking...');
         };
 
         // Handle speech end
         this.recognition.onspeechend = () => {
-            console.log('🤐 Speech detection ended');
+            console.log('🤐 Speech detection ended - user stopped speaking');
+        };
+
+        // Handle no match
+        this.recognition.onnomatch = (event) => {
+            console.warn('🤷 No speech recognition match found');
+        };
+
+        // Handle sound start
+        this.recognition.onsoundstart = () => {
+            console.log('🔉 Sound detection started');
+        };
+
+        // Handle sound end  
+        this.recognition.onsoundend = () => {
+            console.log('🔇 Sound detection ended');
         };
     }
 
@@ -1040,17 +1097,46 @@ class SpeechTranslator {
                 break;
                 
             case 'network':
-                // Handle network errors which are often due to insecure context
-                console.warn('🔒 Network error - likely due to insecure context (HTTP/file://)');
+                // Enhanced network error handling for HTTPS environments
+                console.error('🌐 Network error in speech recognition');
                 const secureContext = this.checkSecureContext();
+                
+                // Log detailed context for debugging
+                console.log('� Network error debug info:', {
+                    isSecure: secureContext.isSecure,
+                    protocol: secureContext.protocol,
+                    hostname: secureContext.hostname,
+                    userAgent: navigator.userAgent,
+                    language: this.recognition?.lang,
+                    onlineStatus: navigator.onLine
+                });
+                
                 if (!secureContext.isSecure) {
                     this.updateStatus('🔒 Speech recognition requires HTTPS - audio recording still works');
                     this.handleInsecureContext(secureContext);
                 } else {
-                    this.updateStatus('❌ Network error - check your internet connection');
+                    // HTTPS environment but still getting network error
+                    console.warn('🚨 Network error in secure context - possible causes:');
+                    console.warn('   • Google Speech API quota exceeded or unavailable');
+                    console.warn('   • Language not supported by browser/service');
+                    console.warn('   • Temporary service outage');
+                    console.warn('   • Firewall/network restrictions');
+                    
+                    this.updateStatus('❌ Speech service temporarily unavailable - audio recording still works');
+                    
+                    // Try to restart recognition after a delay
+                    setTimeout(() => {
+                        if (this.isRecording && this.recognitionSupported) {
+                            console.log('🔄 Attempting to restart speech recognition...');
+                            this.startSpeechRecognition();
+                        }
+                    }, 3000);
                 }
-                // Disable speech recognition to prevent repeated errors
-                this.recognitionSupported = false;
+                
+                // Don't disable recognition immediately in HTTPS - allow retry
+                if (!secureContext.isSecure) {
+                    this.recognitionSupported = false;
+                }
                 break;
                 
             case 'language-not-supported':
@@ -1162,6 +1248,54 @@ class SpeechTranslator {
             hasAnalyser: !!this.analyser,
             isRecording: this.isRecording,
             visualizerBars: visualizerBars.length
+        };
+    }
+
+    // Debug speech recognition status
+    debugSpeechRecognition() {
+        console.log('🔍 SPEECH RECOGNITION DEBUG REPORT');
+        console.log('=====================================');
+        
+        console.log('🌐 Environment:', {
+            url: window.location.href,
+            protocol: window.location.protocol,
+            hostname: window.location.hostname,
+            isHTTPS: window.location.protocol === 'https:',
+            userAgent: navigator.userAgent.substring(0, 100),
+            online: navigator.onLine
+        });
+        
+        console.log('🎤 Speech Recognition Support:', {
+            SpeechRecognition: 'SpeechRecognition' in window,
+            webkitSpeechRecognition: 'webkitSpeechRecognition' in window,
+            recognitionSupported: this.recognitionSupported,
+            recognitionActive: this.recognitionActive,
+            recognitionObject: !!this.recognition
+        });
+        
+        if (this.recognition) {
+            console.log('⚙️ Recognition Configuration:', {
+                lang: this.recognition.lang,
+                continuous: this.recognition.continuous,
+                interimResults: this.recognition.interimResults,
+                maxAlternatives: this.recognition.maxAlternatives
+            });
+        }
+        
+        console.log('🎯 Current State:', {
+            isRecording: this.isRecording,
+            currentLanguages: this.currentLanguages,
+            finalTranscript: this.finalTranscript,
+            interimTranscript: this.interimTranscript
+        });
+        
+        console.log('=====================================');
+        
+        return {
+            supported: this.recognitionSupported,
+            active: this.recognitionActive,
+            configured: !!this.recognition,
+            isHTTPS: window.location.protocol === 'https:'
         };
     }
 
@@ -1520,8 +1654,9 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Initializing Speech Translator...');
     window.speechTranslator = new SpeechTranslator();
     
-    // Make debug method easily accessible
+    // Make debug methods easily accessible
     window.debugAudio = () => window.speechTranslator.debugAudioStream();
+    window.debugSpeech = () => window.speechTranslator.debugSpeechRecognition();
     
     // Add keyboard shortcut hints to the UI
     const statusElement = document.getElementById('status-text');
@@ -1529,6 +1664,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     console.log('💡 Debug commands available:');
     console.log('   - debugAudio() - Check audio stream status');
+    console.log('   - debugSpeech() - Check speech recognition status');
     console.log('   - speechTranslator - Access main translator object');
 });
 
