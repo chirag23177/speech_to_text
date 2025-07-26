@@ -10,6 +10,13 @@ class SpeechTranslator {
         this.analyser = null;
         this.animationFrame = null;
         this.permissionStatus = 'unknown'; // 'granted', 'denied', 'prompt', 'unknown'
+        
+        // Part 3.1: Speech Recognition Properties
+        this.interimTranscript = '';
+        this.finalTranscript = '';
+        this.recognitionActive = false;
+        this.recognitionSupported = false;
+        
         this.currentLanguages = {
             source: 'en-US',
             target: 'es'
@@ -138,6 +145,7 @@ class SpeechTranslator {
         this.updateStatus('Application initialized - Ready to translate');
         this.checkBrowserSupport();
         this.checkMicrophonePermission();
+        this.showSpeechPlaceholder(); // Part 3.1: Show initial placeholder
         console.log('Speech Translator initialized successfully');
     }
 
@@ -149,7 +157,15 @@ class SpeechTranslator {
             fetch: 'fetch' in window
         };
 
-        console.log('Browser support check:', support);
+        // Check if we're in a secure context for speech recognition
+        const secureContext = this.checkSecureContext();
+
+        console.log('Browser support check:', {
+            ...support,
+            secureContext: secureContext.isSecure,
+            protocol: secureContext.protocol,
+            hostname: secureContext.hostname
+        });
 
         if (!support.speechRecognition) {
             this.showError('Speech recognition is not supported in your browser. Please use Chrome, Safari, or Edge.');
@@ -161,8 +177,170 @@ class SpeechTranslator {
             return false;
         }
 
-        this.updateStatus('All required features are supported');
+        // Part 3.1: Initialize speech recognition with security check
+        this.recognitionSupported = support.speechRecognition && secureContext.isSecure;
+        
+        if (support.speechRecognition && !secureContext.isSecure) {
+            this.handleInsecureContext(secureContext);
+        } else if (this.recognitionSupported) {
+            this.initializeSpeechRecognition();
+        }
+
+        // Update status based on what's available
+        if (this.recognitionSupported) {
+            this.updateStatus('All features ready - HTTPS secure connection');
+        } else if (!secureContext.isSecure) {
+            this.updateStatus('Audio recording ready - Speech recognition requires HTTPS');
+        } else {
+            this.updateStatus('Audio recording ready');
+        }
+        
         return true;
+    }
+
+    // Check if we're in a secure context for speech recognition
+    checkSecureContext() {
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+        const isHTTPS = protocol === 'https:';
+        const isFileProtocol = protocol === 'file:';
+        
+        // Speech recognition works in:
+        // 1. HTTPS contexts
+        // 2. Localhost (even with HTTP)
+        // 3. NOT in file:// protocol
+        const isSecure = (isHTTPS || isLocalhost) && !isFileProtocol;
+        
+        return {
+            isSecure,
+            protocol,
+            hostname,
+            isLocalhost,
+            isHTTPS,
+            isFileProtocol
+        };
+    }
+
+    // Handle insecure context gracefully
+    handleInsecureContext(secureContext) {
+        const { protocol, hostname, isFileProtocol } = secureContext;
+        
+        console.warn('🔒 Speech recognition disabled - insecure context detected');
+        console.info('Context details:', {
+            protocol,
+            hostname,
+            isFileProtocol,
+            currentURL: window.location.href
+        });
+
+        // Show user-friendly message
+        if (isFileProtocol) {
+            this.showHTTPSRequirementMessage('file');
+        } else {
+            this.showHTTPSRequirementMessage('http');
+        }
+
+        // Set flag to prevent speech recognition initialization
+        this.recognitionSupported = false;
+    }
+
+    // Show HTTPS requirement message to user
+    showHTTPSRequirementMessage(contextType) {
+        const messageConfig = {
+            file: {
+                title: '🔒 Speech Recognition Requires a Server',
+                message: 'Speech recognition only works over HTTPS or localhost with a server.',
+                suggestions: [
+                    'Use VS Code Live Server extension',
+                    'Run: python -m http.server 8000',
+                    'Run: npx http-server',
+                    'Deploy to GitHub Pages (HTTPS)',
+                    'Use localhost with a development server'
+                ]
+            },
+            http: {
+                title: '🔒 Speech Recognition Requires HTTPS',
+                message: 'Speech recognition only works over secure HTTPS connections.',
+                suggestions: [
+                    'Deploy to GitHub Pages (automatic HTTPS)',
+                    'Use a local development server with HTTPS',
+                    'Run on localhost with a server',
+                    'Use ngrok for HTTPS tunneling'
+                ]
+            }
+        };
+
+        const config = messageConfig[contextType];
+        
+        // Log detailed information
+        console.group('🔒 Speech Recognition Security Requirements');
+        console.warn(config.title);
+        console.info(config.message);
+        console.info('💡 Solutions:');
+        config.suggestions.forEach((suggestion, index) => {
+            console.info(`   ${index + 1}. ${suggestion}`);
+        });
+        console.info('ℹ️  Audio recording and visualization will still work normally.');
+        console.groupEnd();
+
+        // Update UI to show the limitation
+        this.showSecurityNotification(config);
+    }
+
+    // Show security notification in the UI
+    showSecurityNotification(config) {
+        // Create notification element if it doesn't exist
+        let notification = document.getElementById('security-notification');
+        if (!notification) {
+            notification = document.createElement('div');
+            notification.id = 'security-notification';
+            notification.className = 'security-notification';
+            
+            // Insert after header
+            const header = document.querySelector('.header');
+            if (header && header.nextSibling) {
+                header.parentNode.insertBefore(notification, header.nextSibling);
+            } else {
+                document.body.appendChild(notification);
+            }
+        }
+
+        // Set notification content
+        notification.innerHTML = `
+            <div class="notification-content">
+                <div class="notification-header">
+                    <i class="fas fa-lock"></i>
+                    <strong>Speech Recognition Disabled</strong>
+                    <button class="notification-close" onclick="this.parentElement.parentElement.parentElement.style.display='none'">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="notification-body">
+                    <p>${config.message}</p>
+                    <div class="notification-suggestions">
+                        <strong>Quick Solutions:</strong>
+                        <ul>
+                            ${config.suggestions.slice(0, 3).map(suggestion => `<li>${suggestion}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <small class="notification-note">
+                        <i class="fas fa-info-circle"></i>
+                        Audio recording and visualization continue to work normally.
+                    </small>
+                </div>
+            </div>
+        `;
+
+        // Show notification
+        notification.style.display = 'block';
+        
+        // Auto-hide after 10 seconds
+        setTimeout(() => {
+            if (notification && notification.style.display !== 'none') {
+                notification.style.opacity = '0.7';
+            }
+        }, 10000);
     }
 
     // Part 2.1: Check microphone permission status
@@ -309,9 +487,18 @@ class SpeechTranslator {
             // Start audio analysis for visualization
             await this.startAudioAnalysis();
             
+            // Part 3.1: Start speech recognition
+            if (this.recognitionSupported) {
+                this.startSpeechRecognition();
+            }
+            
             // Update UI state
             this.updateUI('recording');
-            this.updateStatus('🎤 Recording... Speak now!');
+            if (this.recognitionSupported) {
+                this.updateStatus('🎤 Recording with speech recognition... Speak now!');
+            } else {
+                this.updateStatus('🎤 Recording audio (speech recognition disabled)... Speak now!');
+            }
             this.updateStatusDot('recording');
             this.showRecordingFeedback();
             
@@ -330,9 +517,12 @@ class SpeechTranslator {
     stopRecording() {
         if (!this.isRecording) return;
         
-        console.log('Stopping recording...');
-        
         try {
+            // Part 3.1: Stop speech recognition first
+            if (this.recognitionSupported) {
+                this.stopSpeechRecognition();
+            }
+            
             // Stop audio analysis
             this.stopAudioAnalysis();
             
@@ -348,7 +538,12 @@ class SpeechTranslator {
             
             console.log('Recording stopped successfully');
             
-            // Simulate processing time
+            // Part 3.1: Finalize speech results
+            if (this.finalTranscript) {
+                this.displayFinalSpeechResult();
+            }
+            
+            // Simulate processing time (will be used for translation in Part 4)
             setTimeout(() => {
                 this.updateUI('idle');
                 this.updateStatus('Ready to translate');
@@ -583,6 +778,283 @@ class SpeechTranslator {
         this.hideRecordingFeedback();
         
         console.log('Audio stream cleanup completed');
+    }
+
+    // ========================================
+    // PART 3.1: SPEECH RECOGNITION METHODS
+    // ========================================
+
+    // Part 3.1: Initialize Speech Recognition API
+    initializeSpeechRecognition() {
+        try {
+            // Use vendor-prefixed version for better browser support
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            this.recognition = new SpeechRecognition();
+            
+            // Configure recognition settings
+            this.configureSpeechRecognition();
+            
+            // Set up event handlers
+            this.setupSpeechRecognitionEvents();
+            
+            console.log('✅ Speech recognition initialized successfully');
+            
+        } catch (error) {
+            console.error('❌ Failed to initialize speech recognition:', error);
+            this.recognitionSupported = false;
+        }
+    }
+
+    // Part 3.1: Configure speech recognition settings
+    configureSpeechRecognition() {
+        if (!this.recognition) return;
+
+        // Basic configuration
+        this.recognition.continuous = true;           // Keep listening continuously
+        this.recognition.interimResults = true;      // Get interim results as user speaks
+        this.recognition.maxAlternatives = 1;        // Only need the best result
+        // this.recognition.grammars = null;            // No specific grammar constraints
+
+        // Set language based on current source language
+        this.recognition.lang = this.currentLanguages.source;
+
+        console.log('✅ Speech recognition configured:', {
+            language: this.recognition.lang,
+            continuous: this.recognition.continuous,
+            interimResults: this.recognition.interimResults
+        });
+    }
+
+    // Part 3.1: Set up speech recognition event handlers
+    setupSpeechRecognitionEvents() {
+        if (!this.recognition) return;
+
+        // Handle successful results
+        this.recognition.onresult = (event) => {
+            this.handleSpeechResults(event);
+        };
+
+        // Handle errors
+        this.recognition.onerror = (event) => {
+            this.handleSpeechError(event);
+        };
+
+        // Handle recognition start
+        this.recognition.onstart = () => {
+            this.recognitionActive = true;
+            console.log('🎤 Speech recognition started');
+        };
+
+        // Handle recognition end
+        this.recognition.onend = () => {
+            this.recognitionActive = false;
+            console.log('🛑 Speech recognition ended');
+            
+            // Restart if we're still recording
+            if (this.isRecording && this.recognitionSupported) {
+                console.log('🔄 Restarting speech recognition...');
+                setTimeout(() => {
+                    this.startSpeechRecognition();
+                }, 100);
+            }
+        };
+
+        // Handle audio start
+        this.recognition.onaudiostart = () => {
+            console.log('🔊 Speech recognition audio started');
+        };
+
+        // Handle audio end
+        this.recognition.onaudioend = () => {
+            console.log('🔇 Speech recognition audio ended');
+        };
+    }
+
+    // Part 3.1: Start speech recognition
+    startSpeechRecognition() {
+        if (!this.recognition || !this.recognitionSupported) {
+            console.warn('⚠️ Speech recognition not available');
+            return;
+        }
+
+        if (this.recognitionActive) {
+            console.log('ℹ️ Speech recognition already active');
+            return;
+        }
+
+        try {
+            // Update language in case it changed
+            this.recognition.lang = this.currentLanguages.source;
+            
+            // Clear previous transcripts
+            this.interimTranscript = '';
+            this.finalTranscript = '';
+            
+            // Start recognition
+            this.recognition.start();
+            console.log('🚀 Starting speech recognition with language:', this.currentLanguages.source);
+            
+        } catch (error) {
+            console.error('❌ Error starting speech recognition:', error);
+            this.handleSpeechError({ error: error.name || 'unknown', message: error.message });
+        }
+    }
+
+    // Part 3.1: Stop speech recognition
+    stopSpeechRecognition() {
+        if (!this.recognition) return;
+
+        try {
+            this.recognition.stop();
+            this.recognitionActive = false;
+            console.log('🛑 Speech recognition stopped');
+            
+        } catch (error) {
+            console.error('❌ Error stopping speech recognition:', error);
+        }
+    }
+
+    // Part 3.1: Handle speech recognition results
+    handleSpeechResults(event) {
+        let interimTranscript = '';
+        let finalTranscript = this.finalTranscript;
+
+        // Process all results
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const result = event.results[i];
+            const transcript = result[0].transcript;
+
+            if (result.isFinal) {
+                finalTranscript += transcript;
+                console.log('✅ Final speech result:', transcript);
+            } else {
+                interimTranscript += transcript;
+            }
+        }
+
+        // Update stored transcripts
+        this.interimTranscript = interimTranscript;
+        this.finalTranscript = finalTranscript;
+
+        // Display combined results
+        this.displaySpeechResults();
+    }
+
+    // Part 3.1: Display speech recognition results
+    displaySpeechResults() {
+        const combinedText = this.finalTranscript + this.interimTranscript;
+        const speechInput = this.elements.speechInput;
+        
+        if (combinedText.trim()) {
+            // Create HTML with final and interim text styled differently
+            const finalHtml = this.finalTranscript ? 
+                `<span class="final-text">${this.finalTranscript}</span>` : '';
+            const interimHtml = this.interimTranscript ? 
+                `<span class="interim-text">${this.interimTranscript}</span>` : '';
+            
+            const fullHtml = finalHtml + interimHtml;
+            
+            // Update the speech input area
+            speechInput.innerHTML = fullHtml;
+            speechInput.classList.add('has-content');
+            
+            // Update status
+            if (this.interimTranscript) {
+                this.updateStatus('🎤 Listening... Speak clearly');
+            }
+        } else {
+            // Show placeholder if no text
+            this.showSpeechPlaceholder();
+        }
+    }
+
+    // Display final speech recognition result
+    displayFinalSpeechResult() {
+        if (!this.finalTranscript) return;
+        
+        console.log('Displaying final speech result:', this.finalTranscript);
+        
+        const speechInput = this.elements.speechInput;
+        
+        // Display final result without interim text
+        speechInput.innerHTML = `<span class="final-text">${this.finalTranscript}</span>`;
+        speechInput.classList.add('has-content');
+        
+        // Update status
+        this.updateStatus(`Transcription complete (${this.finalTranscript.length} characters)`);
+    }
+
+    // Show speech input placeholder
+    showSpeechPlaceholder() {
+        const speechInput = this.elements.speechInput;
+        speechInput.classList.remove('has-content');
+        
+        if (this.recognitionSupported) {
+            speechInput.innerHTML = `
+                <div class="placeholder-text">
+                    <i class="fas fa-microphone-alt"></i>
+                    <p>Your speech will appear here...</p>
+                    <small>Supports: English, Spanish, French, German, and more</small>
+                </div>
+            `;
+        } else {
+            speechInput.innerHTML = `
+                <div class="placeholder-text">
+                    <i class="fas fa-microphone-alt"></i>
+                    <p>Audio recording ready (speech recognition disabled)...</p>
+                    <small>Speech recognition requires HTTPS - audio visualization works normally</small>
+                </div>
+            `;
+        }
+    }
+
+    // Part 3.1: Handle speech recognition errors
+    handleSpeechError(event) {
+        const errorType = event.error || 'unknown';
+        const errorMessage = event.message || 'Speech recognition error';
+        
+        console.error('❌ Speech recognition error:', errorType, errorMessage);
+
+        switch (errorType) {
+            case 'no-speech':
+                // User didn't speak - this is normal, just continue
+                console.log('ℹ️ No speech detected - continuing to listen');
+                break;
+                
+            case 'audio-capture':
+                this.updateStatus('❌ Microphone error - check your microphone');
+                break;
+                
+            case 'not-allowed':
+                this.updateStatus('❌ Microphone permission denied');
+                break;
+                
+            case 'network':
+                // Handle network errors which are often due to insecure context
+                console.warn('🔒 Network error - likely due to insecure context (HTTP/file://)');
+                const secureContext = this.checkSecureContext();
+                if (!secureContext.isSecure) {
+                    this.updateStatus('🔒 Speech recognition requires HTTPS - audio recording still works');
+                    this.handleInsecureContext(secureContext);
+                } else {
+                    this.updateStatus('❌ Network error - check your internet connection');
+                }
+                // Disable speech recognition to prevent repeated errors
+                this.recognitionSupported = false;
+                break;
+                
+            case 'language-not-supported':
+                this.updateStatus('❌ Language not supported for speech recognition');
+                break;
+                
+            case 'service-not-allowed':
+                this.updateStatus('❌ Speech recognition service not available');
+                break;
+                
+            default:
+                this.updateStatus(`❌ Speech recognition error: ${errorType}`);
+                break;
+        }
     }
 
     // Part 2.2: Debug method for manual console testing
@@ -972,14 +1444,12 @@ class SpeechTranslator {
 
     // Clear all text
     clearAllText() {
+        // Part 3.1: Clear speech recognition transcripts
+        this.finalTranscript = '';
+        this.interimTranscript = '';
+        
         // Reset input area
-        this.elements.speechInput.innerHTML = `
-            <div class="placeholder-text">
-                <i class="fas fa-microphone-alt"></i>
-                <p>Your speech will appear here...</p>
-                <small>Supports: English, Spanish, French, German, and more</small>
-            </div>
-        `;
+        this.showSpeechPlaceholder();
         
         // Reset output area
         this.elements.translationOutput.innerHTML = `

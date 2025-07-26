@@ -520,6 +520,13 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    text-align: left;
+    line-height: 1.6;
+}
+
+.text-display.has-content {
+    align-items: flex-start;
+    justify-content: flex-start;
 }
 
 .placeholder-text {
@@ -543,6 +550,20 @@ body {
 .placeholder-text small {
     font-size: 0.9rem;
     opacity: 0.7;
+}
+
+/* Speech recognition text styling */
+.final-text {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 1.2rem;
+}
+
+.interim-text {
+    color: var(--text-muted);
+    font-style: italic;
+    opacity: 0.8;
+    font-size: 1.1rem;
 }
 
 .text-content {
@@ -630,6 +651,95 @@ kbd {
     font-weight: 500;
 }
 
+/* Security Notification */
+.security-notification {
+    display: none;
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(255, 152, 0, 0.15));
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-left: 4px solid var(--accent-color);
+    border-radius: 10px;
+    margin: 1rem 0;
+    backdrop-filter: blur(10px);
+    animation: slideInDown 0.5s ease;
+}
+
+.notification-content {
+    padding: 1rem;
+}
+
+.notification-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+.notification-header i {
+    font-size: 1.1rem;
+}
+
+.notification-close {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 50%;
+    transition: all var(--transition-fast);
+}
+
+.notification-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.notification-body p {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+}
+
+.notification-suggestions {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.notification-suggestions strong {
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.notification-suggestions ul {
+    margin: 0;
+    padding-left: 1.25rem;
+    list-style-type: disc;
+}
+
+.notification-suggestions li {
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+    font-size: 0.9rem;
+}
+
+.notification-note {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+.notification-note i {
+    color: var(--success-color);
+}
+
 /* Enhanced Animations */
 @keyframes fadeIn {
     from {
@@ -644,6 +754,17 @@ kbd {
     from {
         opacity: 0;
         transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
     }
     to {
         opacity: 1;
@@ -795,6 +916,22 @@ kbd {
     .mic-button {
         width: 80px;
         height: 80px;
+    }
+
+    .security-notification {
+        margin: 0.5rem 0;
+    }
+
+    .notification-content {
+        padding: 0.75rem;
+    }
+
+    .notification-suggestions ul {
+        padding-left: 1rem;
+    }
+
+    .notification-suggestions li {
+        font-size: 0.8rem;
     }
 
     .mic-button i {
