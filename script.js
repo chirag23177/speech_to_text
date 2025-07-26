@@ -16,6 +16,8 @@ class SpeechTranslator {
         this.finalTranscript = '';
         this.recognitionActive = false;
         this.recognitionSupported = false;
+        this.speechRecognitionFailed = false; // Track if speech recognition has failed
+        this.lastNetworkError = null; // Track last network error time
         
         this.currentLanguages = {
             source: 'en-US',
@@ -473,6 +475,16 @@ class SpeechTranslator {
         if (this.isRecording) return;
         
         try {
+            // Reset speech recognition failure flag when user manually starts recording
+            this.speechRecognitionFailed = false;
+            
+            // Clear error styling from mic button
+            const micButton = document.getElementById('mic-button');
+            if (micButton) {
+                micButton.classList.remove('error');
+                micButton.title = 'Stop recording';
+            }
+            
             // Request microphone access if we don't have it
             if (!this.mediaStream || !this.mediaStream.active) {
                 const accessGranted = await this.requestMicrophoneAccess();
@@ -862,107 +874,90 @@ class SpeechTranslator {
 
         // Handle successful results
         this.recognition.onresult = (event) => {
-            console.log('🎯 Speech recognition result event fired:', {
-                resultIndex: event.resultIndex,
-                resultsLength: event.results.length,
-                timestamp: new Date().toISOString()
-            });
+            // Reset failure flag on successful result
+            this.speechRecognitionFailed = false;
             this.handleSpeechResults(event);
         };
 
         // Handle errors
         this.recognition.onerror = (event) => {
-            console.error('🚨 Speech recognition error event:', {
-                error: event.error,
-                message: event.message,
-                timestamp: new Date().toISOString()
-            });
             this.handleSpeechError(event);
         };
 
         // Handle recognition start
         this.recognition.onstart = () => {
             this.recognitionActive = true;
-            console.log('🎤 Speech recognition started at', new Date().toISOString());
         };
 
         // Handle recognition end
         this.recognition.onend = () => {
             this.recognitionActive = false;
-            console.log('🛑 Speech recognition ended at', new Date().toISOString());
             
-            // Restart if we're still recording
-            if (this.isRecording && this.recognitionSupported) {
-                console.log('🔄 Restarting speech recognition...');
+            // Only restart if we're still recording AND no network failure occurred
+            if (this.isRecording && this.recognitionSupported && !this.speechRecognitionFailed) {
                 setTimeout(() => {
                     this.startSpeechRecognition();
                 }, 100);
             }
         };
 
-        // Handle audio start
+        // Handle audio start/end and speech detection with minimal logging
         this.recognition.onaudiostart = () => {
-            console.log('🔊 Speech recognition audio started');
+            // Silent - audio started
         };
 
-        // Handle audio end
         this.recognition.onaudioend = () => {
-            console.log('🔇 Speech recognition audio ended');
+            // Silent - audio ended
         };
 
-        // Handle speech start
         this.recognition.onspeechstart = () => {
-            console.log('🗣️ Speech detection started - user is speaking');
             this.updateStatus('🗣️ Speech detected - keep talking...');
         };
 
-        // Handle speech end
         this.recognition.onspeechend = () => {
-            console.log('🤐 Speech detection ended - user stopped speaking');
+            // Silent - speech ended
         };
 
-        // Handle no match
-        this.recognition.onnomatch = (event) => {
-            console.warn('🤷 No speech recognition match found');
+        this.recognition.onnomatch = () => {
+            // Silent - no match found
         };
 
-        // Handle sound start
         this.recognition.onsoundstart = () => {
-            console.log('🔉 Sound detection started');
+            // Silent - sound detected
         };
 
-        // Handle sound end  
         this.recognition.onsoundend = () => {
-            console.log('🔇 Sound detection ended');
+            // Silent - sound ended
         };
     }
 
     // Part 3.1: Start speech recognition
     startSpeechRecognition() {
         if (!this.recognition || !this.recognitionSupported) {
-            console.warn('⚠️ Speech recognition not available');
             return;
         }
 
         if (this.recognitionActive) {
-            console.log('ℹ️ Speech recognition already active');
-            return;
+            return; // Already active, don't start again
+        }
+
+        // Check if we previously failed due to network error
+        if (this.speechRecognitionFailed) {
+            return; // Don't auto-restart after failure
         }
 
         try {
             // Update language in case it changed
-            this.recognition.lang = this.currentLanguages.source;
+            this.recognition.lang = this.validateLanguageCode(this.currentLanguages.source);
             
-            // Clear previous transcripts
+            // Clear previous transcripts on new session
             this.interimTranscript = '';
             this.finalTranscript = '';
             
             // Start recognition
             this.recognition.start();
-            console.log('🚀 Starting speech recognition with language:', this.currentLanguages.source);
             
         } catch (error) {
-            console.error('❌ Error starting speech recognition:', error);
             this.handleSpeechError({ error: error.name || 'unknown', message: error.message });
         }
     }
@@ -1080,6 +1075,18 @@ class SpeechTranslator {
         const errorType = event.error || 'unknown';
         const errorMessage = event.message || 'Speech recognition error';
         
+        // Mark as failed to prevent auto-restart (except for no-speech which is normal)
+        if (errorType !== 'no-speech') {
+            this.speechRecognitionFailed = true;
+            
+            // Store error for debugging
+            this.lastNetworkError = { 
+                error: errorType, 
+                message: errorMessage, 
+                timestamp: Date.now() 
+            };
+        }
+        
         console.error('❌ Speech recognition error:', errorType, errorMessage);
 
         switch (errorType) {
@@ -1116,21 +1123,7 @@ class SpeechTranslator {
                     this.handleInsecureContext(secureContext);
                 } else {
                     // HTTPS environment but still getting network error
-                    console.warn('🚨 Network error in secure context - possible causes:');
-                    console.warn('   • Google Speech API quota exceeded or unavailable');
-                    console.warn('   • Language not supported by browser/service');
-                    console.warn('   • Temporary service outage');
-                    console.warn('   • Firewall/network restrictions');
-                    
-                    this.updateStatus('❌ Speech service temporarily unavailable - audio recording still works');
-                    
-                    // Try to restart recognition after a delay
-                    setTimeout(() => {
-                        if (this.isRecording && this.recognitionSupported) {
-                            console.log('🔄 Attempting to restart speech recognition...');
-                            this.startSpeechRecognition();
-                        }
-                    }, 3000);
+                    this.updateStatus('❌ Speech service temporarily unavailable - click microphone to retry');
                 }
                 
                 // Don't disable recognition immediately in HTTPS - allow retry
@@ -1150,6 +1143,19 @@ class SpeechTranslator {
             default:
                 this.updateStatus(`❌ Speech recognition error: ${errorType}`);
                 break;
+        }
+        
+        // Update microphone button to show retry is needed (except for no-speech)
+        if (errorType !== 'no-speech') {
+            const micButton = document.getElementById('mic-button');
+            if (micButton) {
+                micButton.classList.add('error');
+                micButton.title = 'Click to retry speech recognition';
+            }
+        }
+        
+        if (this.debugMode) {
+            this.debugSpeech(`Error: ${errorType} - ${errorMessage}`);
         }
     }
 
