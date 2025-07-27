@@ -34,6 +34,13 @@ class SpeechTranslator {
         this.streamingActive = false;
         this.isStreamingMode = true; // Use real-time streaming instead of batch processing
         
+        // Auto-commit properties for continuous speech
+        this.autoCommitTimer = null;
+        this.autoCommitInterval = 5000; // 5 seconds
+        this.lastCommitTime = 0;
+        this.pendingInterimText = '';
+        this.wordCompleteDelay = 1000; // 1 second to wait for word completion
+        
         this.currentLanguages = {
             source: 'en-US',
             target: 'es'
@@ -1327,6 +1334,12 @@ class SpeechTranslator {
                 this.socket.emit('stop-stream');
             }
 
+            // Clean up auto-commit timer and commit any pending text
+            this.clearAutoCommitTimer();
+            if (this.pendingInterimText.trim()) {
+                this.commitInterimText();
+            }
+
             this.streamingActive = false;
             this.recognitionActive = false;
 
@@ -1339,12 +1352,18 @@ class SpeechTranslator {
     // Handle real-time streaming results
     handleStreamingResult(data) {
         const { transcript, confidence, isFinal } = data;
+        const now = Date.now();
 
         if (isFinal) {
             // Final result - add to final transcript
             if (transcript && transcript.trim()) {
                 this.finalTranscript += (this.finalTranscript ? ' ' : '') + transcript.trim();
                 this.interimTranscript = '';
+                this.pendingInterimText = '';
+                this.lastCommitTime = now;
+                
+                // Clear auto-commit timer since we got a final result
+                this.clearAutoCommitTimer();
                 
                 this.displayFinalSpeechResult();
                 
@@ -1355,7 +1374,79 @@ class SpeechTranslator {
         } else {
             // Interim result - update interim transcript
             this.interimTranscript = transcript || '';
+            this.pendingInterimText = transcript || '';
+            
+            // Start auto-commit timer if this is the first interim result after a commit
+            if (!this.autoCommitTimer && this.streamingActive) {
+                this.startAutoCommitTimer();
+            }
+            
+            // Check if we should auto-commit based on time
+            if (now - this.lastCommitTime >= this.autoCommitInterval && this.pendingInterimText.trim()) {
+                this.scheduleAutoCommit();
+            }
+            
             this.displayInterimSpeechResult();
+        }
+    }
+
+    // Start auto-commit timer for continuous speech
+    startAutoCommitTimer() {
+        this.clearAutoCommitTimer();
+        
+        this.autoCommitTimer = setTimeout(() => {
+            if (this.pendingInterimText.trim() && this.streamingActive) {
+                // Wait a bit more for word completion, then commit
+                this.scheduleAutoCommit();
+            }
+        }, this.autoCommitInterval);
+    }
+
+    // Schedule auto-commit with word completion delay
+    scheduleAutoCommit() {
+        this.clearAutoCommitTimer();
+        
+        // Wait for potential word completion
+        this.autoCommitTimer = setTimeout(() => {
+            this.commitInterimText();
+        }, this.wordCompleteDelay);
+    }
+
+    // Commit interim text as final text
+    commitInterimText() {
+        if (this.pendingInterimText.trim()) {
+            // Add the interim text to final transcript
+            this.finalTranscript += (this.finalTranscript ? ' ' : '') + this.pendingInterimText.trim();
+            
+            // Clear interim text
+            this.interimTranscript = '';
+            this.pendingInterimText = '';
+            this.lastCommitTime = Date.now();
+            
+            console.log('✅ Auto-committed interim text after 5 seconds');
+            
+            // Update display
+            this.displayFinalSpeechResult();
+            this.updateStatus('Auto-committed text - continue speaking...');
+            
+            // Restart timer for next chunk if still actively speaking
+            if (this.streamingActive) {
+                setTimeout(() => {
+                    if (this.interimTranscript.trim()) {
+                        this.startAutoCommitTimer();
+                    }
+                }, 500); // Small delay to see if more speech comes
+            }
+        }
+        
+        this.clearAutoCommitTimer();
+    }
+
+    // Clear auto-commit timer
+    clearAutoCommitTimer() {
+        if (this.autoCommitTimer) {
+            clearTimeout(this.autoCommitTimer);
+            this.autoCommitTimer = null;
         }
     }
 
@@ -1388,11 +1479,20 @@ class SpeechTranslator {
     displayInterimSpeechResult() {
         if (!this.elements.speechInput) return;
 
-        const combined = this.finalTranscript + (this.interimTranscript ? ' ' + this.interimTranscript : '');
+        const timeSinceLastCommit = Date.now() - this.lastCommitTime;
+        const timeUntilAutoCommit = this.autoCommitInterval - timeSinceLastCommit;
+        const showCommitIndicator = timeUntilAutoCommit < 2000 && this.pendingInterimText.trim(); // Show indicator in last 2 seconds
+        
+        let interimHtml = '';
+        if (this.interimTranscript) {
+            const interimClass = showCommitIndicator ? 'interim-text pending-commit' : 'interim-text';
+            interimHtml = `<span class="${interimClass}">${this.interimTranscript}</span>`;
+        }
         
         this.elements.speechInput.innerHTML = `
             <span class="final-text">${this.finalTranscript}</span>
-            ${this.interimTranscript ? `<span class="interim-text">${this.interimTranscript}</span>` : ''}
+            ${interimHtml}
+            ${showCommitIndicator ? '<span class="commit-indicator">⏱️</span>' : ''}
         `;
         
         // Auto-scroll to bottom
@@ -1460,6 +1560,7 @@ class SpeechTranslator {
             'de-DE': 'de-DE',
             'it-IT': 'it-IT',
             'pt-PT': 'pt-PT',
+            'hi-IN': 'hi-IN',
             'zh-CN': 'zh-CN',
             'ja-JP': 'ja-JP',
             'ko-KR': 'ko-KR',
@@ -2089,6 +2190,7 @@ class SpeechTranslator {
             'de-DE': 'de',
             'it-IT': 'it',
             'pt-PT': 'pt',
+            'hi-IN': 'hi',
             'zh-CN': 'zh',
             'ja-JP': 'ja',
             'ko-KR': 'ko',
@@ -2102,6 +2204,7 @@ class SpeechTranslator {
             'de': 'de-DE',
             'it': 'it-IT',
             'pt': 'pt-PT',
+            'hi': 'hi-IN',
             'zh': 'zh-CN',
             'ja': 'ja-JP',
             'ko': 'ko-KR',

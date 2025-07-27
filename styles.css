@@ -628,6 +628,29 @@ body {
     animation: pulse 1.5s ease-in-out infinite;
 }
 
+.interim-text.pending-commit {
+    color: var(--accent-color);
+    opacity: 0.9;
+    animation: pendingCommit 1s ease-in-out infinite;
+}
+
+.commit-indicator {
+    color: var(--accent-color);
+    font-size: 1rem;
+    margin-left: 8px;
+    animation: bounce 1s ease-in-out infinite;
+}
+
+@keyframes pendingCommit {
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 0.6; }
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+
 @keyframes pulse {
     0%, 100% { opacity: 0.8; }
     50% { opacity: 0.5; }
