@@ -19,6 +19,16 @@ class SpeechTranslator {
         this.speechRecognitionFailed = false; // Track if speech recognition has failed
         this.lastNetworkError = null; // Track last network error time
         
+        // Google Cloud Speech-to-Text Properties
+        this.mediaRecorder = null;
+        this.audioChunks = [];
+        this.isGoogleCloudMode = true; // Use Google Cloud instead of Web Speech API
+        this.backendUrl = 'http://localhost:3001'; // Backend server URL
+        this.recordingTimeout = null;
+        this.silenceThreshold = 0.01; // Silence detection threshold
+        this.silenceTimer = null;
+        this.maxSilenceDuration = 2000; // 2 seconds of silence before processing
+        
         this.currentLanguages = {
             source: 'en-US',
             target: 'es'
@@ -170,51 +180,58 @@ class SpeechTranslator {
     }
 
     // Check browser support for required APIs
-    checkBrowserSupport() {
+    async checkBrowserSupport() {
         const support = {
             speechRecognition: 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window,
             mediaDevices: 'mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices,
+            mediaRecorder: 'MediaRecorder' in window,
             fetch: 'fetch' in window
         };
 
-        // Check if we're in a secure context for speech recognition
+        // Check if we're in a secure context
         const secureContext = this.checkSecureContext();
 
         console.log('Browser support check:', {
             ...support,
             secureContext: secureContext.isSecure,
             protocol: secureContext.protocol,
-            hostname: secureContext.hostname
+            hostname: secureContext.hostname,
+            googleCloudMode: this.isGoogleCloudMode
         });
-
-        if (!support.speechRecognition) {
-            this.showError('Speech recognition is not supported in your browser. Please use Chrome, Safari, or Edge.');
-            return false;
-        }
 
         if (!support.mediaDevices) {
             this.showError('Microphone access is not supported in your browser.');
             return false;
         }
 
-        // Part 3.1: Initialize speech recognition with security check
-        this.recognitionSupported = support.speechRecognition && secureContext.isSecure;
-        
-        if (support.speechRecognition && !secureContext.isSecure) {
-            this.handleInsecureContext(secureContext);
-        } else if (this.recognitionSupported) {
-            this.initializeSpeechRecognition();
+        if (!support.mediaRecorder) {
+            this.showError('Audio recording is not supported in your browser. Please use a modern browser.');
+            return false;
         }
 
-        // Update status based on what's available
-        if (this.recognitionSupported) {
-            this.updateStatus('All features ready - HTTPS secure connection');
-        } else if (!secureContext.isSecure) {
-            this.updateStatus('Audio recording ready - Speech recognition requires HTTPS');
+        // Check backend connectivity for Google Cloud mode
+        if (this.isGoogleCloudMode) {
+            const backendReady = await this.checkBackendHealth();
+            if (backendReady) {
+                this.recognitionSupported = true;
+                this.updateStatus('Google Cloud Speech-to-Text ready');
+            } else {
+                this.recognitionSupported = false;
+                this.updateStatus('Backend unavailable - Using manual input mode');
+                this.showBackendConnectionError();
+            }
         } else {
-            this.updateStatus('Audio recording ready');
+            // Fallback to Web Speech API
+            this.recognitionSupported = support.speechRecognition && secureContext.isSecure;
+            
+            if (support.speechRecognition && !secureContext.isSecure) {
+                this.handleInsecureContext(secureContext);
+            } else if (this.recognitionSupported) {
+                this.initializeSpeechRecognition();
+                this.updateStatus('Web Speech API ready');
+            }
         }
-        
+
         return true;
     }
 
@@ -240,6 +257,56 @@ class SpeechTranslator {
             isHTTPS,
             isFileProtocol
         };
+    }
+
+    // Check backend server health and connectivity
+    async checkBackendHealth() {
+        try {
+            const response = await fetch(`${this.backendUrl}/health`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                // Add timeout
+                signal: AbortSignal.timeout(5000)
+            });
+
+            if (response.ok) {
+                const health = await response.json();
+                console.log('✅ Backend health check:', health);
+                
+                if (!health.speechClientReady) {
+                    console.warn('⚠️ Backend server running but Google Cloud Speech client not ready');
+                    return false;
+                }
+                
+                return true;
+            } else {
+                console.warn('⚠️ Backend health check failed:', response.status, response.statusText);
+                return false;
+            }
+        } catch (error) {
+            console.warn('⚠️ Backend not reachable:', error.message);
+            return false;
+        }
+    }
+
+    // Show backend connection error message
+    showBackendConnectionError() {
+        this.showNetworkErrorGuidance();
+        
+        // Also update the speech placeholder
+        const speechInput = this.elements.speechInput;
+        speechInput.classList.remove('has-content');
+        speechInput.innerHTML = `
+            <div class="placeholder-text editable-hint">
+                <i class="fas fa-server"></i>
+                <p>Backend server unavailable - Click here to type manually</p>
+                <small>Please start the backend server: npm start</small>
+            </div>
+        `;
+        speechInput.contentEditable = true;
+        speechInput.setAttribute('data-placeholder', 'Type your text here...');
     }
 
     // Handle insecure context gracefully
@@ -555,7 +622,7 @@ class SpeechTranslator {
         }
     }
 
-    // Enhanced start recording with audio analysis
+    // Enhanced start recording with Google Cloud Speech integration
     async startRecording() {
         if (this.isRecording) return;
         
@@ -584,15 +651,22 @@ class SpeechTranslator {
             // Start audio analysis for visualization
             await this.startAudioAnalysis();
             
-            // Part 3.1: Start speech recognition
-            if (this.recognitionSupported) {
+            // Initialize audio recording for Google Cloud Speech
+            if (this.isGoogleCloudMode && this.recognitionSupported) {
+                await this.startGoogleCloudRecording();
+            } else if (this.recognitionSupported) {
+                // Fallback to Web Speech API
                 this.startSpeechRecognition();
             }
             
             // Update UI state
             this.updateUI('recording');
             if (this.recognitionSupported) {
-                this.updateStatus('🎤 Recording with speech recognition... Speak now!');
+                if (this.isGoogleCloudMode) {
+                    this.updateStatus('🎤 Recording with Google Cloud Speech... Speak now!');
+                } else {
+                    this.updateStatus('🎤 Recording with Web Speech API... Speak now!');
+                }
             } else {
                 this.updateStatus('🎤 Recording audio (speech recognition disabled)... Speak now!');
             }
@@ -610,13 +684,16 @@ class SpeechTranslator {
         }
     }
     
-    // Enhanced stop recording with proper cleanup
+    // Enhanced stop recording with Google Cloud Speech integration
     stopRecording() {
         if (!this.isRecording) return;
         
         try {
-            // Part 3.1: Stop speech recognition first
-            if (this.recognitionSupported) {
+            // Stop Google Cloud recording first
+            if (this.isGoogleCloudMode && this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                this.stopGoogleCloudRecording();
+            } else if (this.recognitionSupported) {
+                // Fallback to Web Speech API
                 this.stopSpeechRecognition();
             }
             
@@ -634,18 +711,6 @@ class SpeechTranslator {
             this.elements.micButton.classList.remove('recording');
             
             console.log('Recording stopped successfully');
-            
-            // Part 3.1: Finalize speech results
-            if (this.finalTranscript) {
-                this.displayFinalSpeechResult();
-            }
-            
-            // Simulate processing time (will be used for translation in Part 4)
-            setTimeout(() => {
-                this.updateUI('idle');
-                this.updateStatus('Ready to translate');
-                this.updateStatusDot('idle');
-            }, 1500);
             
         } catch (error) {
             console.error('Error stopping recording:', error);
@@ -750,6 +815,11 @@ class SpeechTranslator {
             const average = sum / bufferLength;
             const normalizedLevel = Math.min(average / 128, 1); // Normalize to 0-1
             
+            // Google Cloud Speech silence detection
+            if (self.isGoogleCloudMode && self.mediaRecorder && self.mediaRecorder.state === 'recording') {
+                self.handleSilenceDetection(normalizedLevel);
+            }
+            
             // Minimal logging for critical issues only
             frameCount++;
             if (frameCount % logInterval === 0) {
@@ -834,6 +904,36 @@ class SpeechTranslator {
         this.showAudioVisualizer();
     }
     
+    // Handle silence detection for Google Cloud Speech
+    handleSilenceDetection(audioLevel) {
+        // Reset silence timer if audio is detected
+        if (audioLevel > this.silenceThreshold) {
+            if (this.silenceTimer) {
+                clearTimeout(this.silenceTimer);
+                this.silenceTimer = null;
+            }
+        } else {
+            // Start silence timer if not already running
+            if (!this.silenceTimer) {
+                this.silenceTimer = setTimeout(() => {
+                    // Process current audio chunks if we have them
+                    if (this.audioChunks.length > 0 && this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                        console.log('Silence detected - processing audio chunks');
+                        this.mediaRecorder.stop();
+                        
+                        // Restart recording for continuous speech
+                        setTimeout(() => {
+                            if (this.isRecording) {
+                                this.startGoogleCloudRecording();
+                            }
+                        }, 500);
+                    }
+                    this.silenceTimer = null;
+                }, this.maxSilenceDuration);
+            }
+        }
+    }
+    
     // Part 2.2: Hide recording feedback UI
     hideRecordingFeedback() {
         // Hide recording indicator
@@ -875,6 +975,189 @@ class SpeechTranslator {
         this.hideRecordingFeedback();
         
         console.log('Audio stream cleanup completed');
+    }
+
+    // ========================================
+    // GOOGLE CLOUD SPEECH-TO-TEXT METHODS
+    // ========================================
+
+    // Start Google Cloud Speech recording
+    async startGoogleCloudRecording() {
+        try {
+            // Clear previous audio chunks
+            this.audioChunks = [];
+            
+            // Check MediaRecorder support and configure
+            const mimeType = this.getSupportedMimeType();
+            
+            this.mediaRecorder = new MediaRecorder(this.mediaStream, {
+                mimeType: mimeType
+            });
+            
+            // Set up event handlers
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    this.audioChunks.push(event.data);
+                    console.log(`Audio chunk received: ${event.data.size} bytes`);
+                }
+            };
+            
+            this.mediaRecorder.onstop = () => {
+                this.processGoogleCloudAudio();
+            };
+            
+            this.mediaRecorder.onerror = (event) => {
+                console.error('MediaRecorder error:', event.error);
+                this.handleSpeechError({ error: 'recording-error', message: event.error.message });
+            };
+            
+            // Start recording with time slices for continuous processing
+            this.mediaRecorder.start(1000); // 1 second chunks
+            this.recognitionActive = true;
+            
+            console.log('Google Cloud Speech recording started:', {
+                mimeType: mimeType,
+                state: this.mediaRecorder.state
+            });
+            
+            // Set up silence detection for auto-processing
+            this.setupSilenceDetection();
+            
+        } catch (error) {
+            console.error('Failed to start Google Cloud recording:', error);
+            this.handleSpeechError({ error: 'recording-setup-failed', message: error.message });
+        }
+    }
+    
+    // Stop Google Cloud Speech recording
+    stopGoogleCloudRecording() {
+        try {
+            if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                this.mediaRecorder.stop();
+                this.recognitionActive = false;
+                
+                // Clear silence detection
+                if (this.silenceTimer) {
+                    clearTimeout(this.silenceTimer);
+                    this.silenceTimer = null;
+                }
+                
+                console.log('Google Cloud Speech recording stopped');
+            }
+        } catch (error) {
+            console.error('Failed to stop Google Cloud recording:', error);
+        }
+    }
+    
+    // Process recorded audio with Google Cloud Speech
+    async processGoogleCloudAudio() {
+        if (this.audioChunks.length === 0) {
+            console.warn('No audio chunks to process');
+            return;
+        }
+        
+        try {
+            // Create blob from audio chunks
+            const mimeType = this.mediaRecorder.mimeType;
+            const audioBlob = new Blob(this.audioChunks, { type: mimeType });
+            
+            console.log('Processing audio with Google Cloud Speech:', {
+                size: audioBlob.size,
+                type: audioBlob.type,
+                language: this.currentLanguages.source
+            });
+            
+            // Prepare form data for backend
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.webm');
+            formData.append('language', this.currentLanguages.source);
+            
+            // Send to backend for transcription
+            const response = await fetch(`${this.backendUrl}/transcribe`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Backend error: ${response.status} ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            
+            // Handle the transcription result
+            this.handleGoogleCloudResult(result);
+            
+        } catch (error) {
+            console.error('Google Cloud Speech processing failed:', error);
+            this.handleSpeechError({ 
+                error: 'transcription-failed', 
+                message: `Transcription failed: ${error.message}` 
+            });
+        }
+    }
+    
+    // Handle Google Cloud Speech result
+    handleGoogleCloudResult(result) {
+        if (result.transcript && result.transcript.trim()) {
+            this.finalTranscript = result.transcript.trim();
+            this.interimTranscript = '';
+            
+            console.log('Google Cloud Speech result:', {
+                transcript: this.finalTranscript,
+                confidence: result.confidence,
+                language: result.language
+            });
+            
+            // Display the result
+            this.displayFinalSpeechResult();
+            
+            // Update status with confidence info
+            const confidencePercent = Math.round((result.confidence || 0) * 100);
+            this.updateStatus(`Transcription complete (${confidencePercent}% confidence)`);
+            
+            // Transition to idle state
+            setTimeout(() => {
+                this.updateUI('idle');
+                this.updateStatus('Ready to translate');
+                this.updateStatusDot('idle');
+            }, 1500);
+            
+        } else {
+            console.log('No speech detected in audio');
+            this.updateStatus('No speech detected - try again');
+            
+            // Transition to idle state
+            setTimeout(() => {
+                this.updateUI('idle');
+                this.updateStatus('Ready to translate');
+                this.updateStatusDot('idle');
+            }, 1000);
+        }
+    }
+    
+    // Set up silence detection for auto-processing
+    setupSilenceDetection() {
+        // This will be called during audio visualization
+        // We'll monitor the audio level and trigger processing after silence
+    }
+    
+    // Get supported MIME type for MediaRecorder
+    getSupportedMimeType() {
+        const types = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/ogg;codecs=opus',
+            'audio/wav'
+        ];
+        
+        for (const type of types) {
+            if (MediaRecorder.isTypeSupported(type)) {
+                return type;
+            }
+        }
+        
+        // Fallback - let MediaRecorder choose
+        return '';
     }
 
     // ========================================
