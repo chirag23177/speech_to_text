@@ -46,6 +46,12 @@ class SpeechTranslator {
             target: 'es'
         };
         
+        // UX Enhancement properties
+        this.translationHistory = [];
+        this.maxHistoryItems = 100;
+        this.tooltipTimeout = null;
+        this.isHistoryVisible = false;
+        
         this.initializeElements();
         this.setupEventListeners();
         this.initializeApp();
@@ -71,7 +77,19 @@ class SpeechTranslator {
             settingsBtn: document.getElementById('settings-btn'),
             audioVisualizer: document.getElementById('audio-visualizer'),
             confidenceIndicator: document.getElementById('confidence-indicator'),
-            confidenceText: document.querySelector('.confidence-text')
+            confidenceText: document.querySelector('.confidence-text'),
+            // UX Enhancement elements
+            historyBtn: document.getElementById('history-btn'),
+            historyPanel: document.getElementById('history-panel'),
+            historyList: document.getElementById('history-list'),
+            closeHistoryBtn: document.getElementById('close-history'),
+            clearHistoryBtn: document.getElementById('clear-history'),
+            exportHistoryBtn: document.getElementById('export-history'),
+            clearInputBtn: document.getElementById('clear-input'),
+            saveTranslationBtn: document.getElementById('save-translation'),
+            historyCount: document.getElementById('history-count'),
+            historySize: document.getElementById('history-size'),
+            tooltip: document.getElementById('tooltip')
         };
     }
 
@@ -131,25 +149,77 @@ class SpeechTranslator {
             this.showSettings();
         });
 
+        // UX Enhancement event listeners
+        this.setupUXEventListeners();
+
         // Popular language shortcuts
         this.initializeLanguageShortcuts();
 
-        // Keyboard shortcuts
+        // Enhanced keyboard shortcuts
         document.addEventListener('keydown', (e) => {
+            // Basic recording controls
             if (e.code === 'Space' && e.ctrlKey) {
                 e.preventDefault();
                 this.toggleRecording();
             }
-            if (e.code === 'KeyS' && e.ctrlKey) {
+            
+            // Language controls
+            if (e.code === 'KeyS' && e.ctrlKey && !e.shiftKey) {
                 e.preventDefault();
                 this.swapLanguagesEnhanced();
             }
+            
+            // UI controls
             if (e.code === 'KeyT' && e.ctrlKey) {
                 e.preventDefault();
                 this.toggleTheme();
             }
+            
+            // History controls
+            if (e.code === 'KeyH' && e.ctrlKey && !e.shiftKey) {
+                e.preventDefault();
+                this.toggleHistory();
+            }
+            
+            if (e.code === 'KeyH' && e.ctrlKey && e.shiftKey) {
+                e.preventDefault();
+                this.clearHistory();
+            }
+            
+            // Copy controls
+            if (e.code === 'KeyC' && e.ctrlKey && e.shiftKey) {
+                e.preventDefault();
+                this.copyToClipboard('output');
+            }
+            
+            // Clear controls
+            if (e.code === 'KeyC' && e.ctrlKey && e.shiftKey && e.altKey) {
+                e.preventDefault();
+                this.clearAllText();
+            }
+            
+            if (e.code === 'KeyI' && e.ctrlKey && e.shiftKey) {
+                e.preventDefault();
+                this.clearInput();
+            }
+            
+            // Read aloud
+            if (e.code === 'KeyR' && e.ctrlKey) {
+                e.preventDefault();
+                this.speakText('output');
+            }
+            
+            // Settings
+            if (e.code === 'Comma' && e.ctrlKey) {
+                e.preventDefault();
+                this.showSettings();
+            }
+            
+            // Escape handling
             if (e.code === 'Escape') {
-                if (this.isRecording) {
+                if (this.isHistoryVisible) {
+                    this.hideHistory();
+                } else if (this.isRecording) {
                     this.stopRecording();
                 }
             }
@@ -199,6 +269,7 @@ class SpeechTranslator {
         this.checkMicrophonePermission();
         this.showSpeechPlaceholder(); // Part 3.1: Show initial placeholder
         this.initializeSocketIO(); // Initialize real-time streaming
+        this.initializeUXFeatures(); // Initialize UX enhancements
         console.log('Speech Translator initialized successfully');
     }
 
@@ -2740,8 +2811,645 @@ class SpeechTranslator {
             isRecording: this.isRecording,
             permissionStatus: this.permissionStatus,
             hasMediaStream: !!this.mediaStream,
-            browserSupport: this.checkBrowserSupport()
+            browserSupport: this.checkBrowserSupport(),
+            historyCount: this.translationHistory.length
         };
+    }
+
+    // ============================================
+    // UX ENHANCEMENT METHODS - Phase 5 Part 2
+    // ============================================
+
+    // Initialize UX enhancement features
+    initializeUXFeatures() {
+        this.loadTranslationHistory();
+        this.updateHistoryStats();
+        this.initializeTooltips();
+        console.log('✨ UX Enhancement features initialized');
+    }
+
+    // Setup UX-related event listeners
+    setupUXEventListeners() {
+        // History panel controls
+        if (this.elements.historyBtn) {
+            this.elements.historyBtn.addEventListener('click', () => {
+                this.toggleHistory();
+            });
+        }
+
+        if (this.elements.closeHistoryBtn) {
+            this.elements.closeHistoryBtn.addEventListener('click', () => {
+                this.hideHistory();
+            });
+        }
+
+        if (this.elements.clearHistoryBtn) {
+            this.elements.clearHistoryBtn.addEventListener('click', () => {
+                this.showConfirmDialog('Clear all translation history?', () => {
+                    this.clearHistory();
+                });
+            });
+        }
+
+        if (this.elements.exportHistoryBtn) {
+            this.elements.exportHistoryBtn.addEventListener('click', () => {
+                this.exportHistory();
+            });
+        }
+
+        // Individual action buttons
+        if (this.elements.clearInputBtn) {
+            this.elements.clearInputBtn.addEventListener('click', () => {
+                this.clearInput();
+            });
+        }
+
+        if (this.elements.saveTranslationBtn) {
+            this.elements.saveTranslationBtn.addEventListener('click', () => {
+                this.saveCurrentTranslation();
+            });
+        }
+
+        // Click outside to close history
+        if (this.elements.historyPanel) {
+            this.elements.historyPanel.addEventListener('click', (e) => {
+                if (e.target === this.elements.historyPanel) {
+                    this.hideHistory();
+                }
+            });
+        }
+    }
+
+    // Translation History Management
+    addToHistory(originalText, translatedText, sourceLang, targetLang, confidence = null) {
+        const historyItem = {
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            originalText: originalText.trim(),
+            translatedText: translatedText.trim(),
+            sourceLang: sourceLang,
+            targetLang: targetLang,
+            confidence: confidence,
+            sourceLanguageName: this.getLanguageName(sourceLang),
+            targetLanguageName: this.getLanguageName(targetLang)
+        };
+
+        // Add to beginning of array
+        this.translationHistory.unshift(historyItem);
+
+        // Limit history size
+        if (this.translationHistory.length > this.maxHistoryItems) {
+            this.translationHistory = this.translationHistory.slice(0, this.maxHistoryItems);
+        }
+
+        // Save to localStorage
+        this.saveTranslationHistory();
+        this.updateHistoryStats();
+        
+        // If history is visible, refresh the display
+        if (this.isHistoryVisible) {
+            this.renderHistoryList();
+        }
+
+        console.log('✅ Translation added to history:', historyItem);
+    }
+
+    loadTranslationHistory() {
+        try {
+            const saved = localStorage.getItem('translation-history');
+            if (saved) {
+                this.translationHistory = JSON.parse(saved);
+                console.log(`📚 Loaded ${this.translationHistory.length} history items`);
+            }
+        } catch (error) {
+            console.error('Failed to load translation history:', error);
+            this.translationHistory = [];
+        }
+    }
+
+    saveTranslationHistory() {
+        try {
+            localStorage.setItem('translation-history', JSON.stringify(this.translationHistory));
+        } catch (error) {
+            console.error('Failed to save translation history:', error);
+        }
+    }
+
+    clearHistory() {
+        this.translationHistory = [];
+        this.saveTranslationHistory();
+        this.updateHistoryStats();
+        this.renderHistoryList();
+        this.updateStatus('Translation history cleared');
+        this.showSuccessAnimation(this.elements.clearHistoryBtn);
+    }
+
+    exportHistory() {
+        if (this.translationHistory.length === 0) {
+            this.updateStatus('No history to export');
+            return;
+        }
+
+        const exportData = {
+            exportDate: new Date().toISOString(),
+            version: '1.0',
+            totalTranslations: this.translationHistory.length,
+            translations: this.translationHistory
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+            type: 'application/json'
+        });
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `translation-history-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.updateStatus('History exported successfully');
+        this.showSuccessAnimation(this.elements.exportHistoryBtn);
+    }
+
+    saveCurrentTranslation() {
+        const originalElement = this.elements.speechInput.querySelector('.final-text, .text-content');
+        const translatedElement = this.elements.translationOutput.querySelector('.translated-text, .text-content');
+
+        if (!originalElement || !translatedElement) {
+            this.updateStatus('No translation to save');
+            return;
+        }
+
+        const originalText = originalElement.textContent.trim();
+        const translatedText = translatedElement.textContent.trim();
+
+        if (!originalText || !translatedText) {
+            this.updateStatus('No complete translation to save');
+            return;
+        }
+
+        this.addToHistory(
+            originalText,
+            translatedText,
+            this.currentLanguages.source,
+            this.currentLanguages.target
+        );
+
+        this.updateStatus('Translation saved to history');
+        this.showSuccessAnimation(this.elements.saveTranslationBtn);
+    }
+
+    // History UI Management
+    toggleHistory() {
+        if (this.isHistoryVisible) {
+            this.hideHistory();
+        } else {
+            this.showHistory();
+        }
+    }
+
+    showHistory() {
+        this.isHistoryVisible = true;
+        this.elements.historyPanel.classList.remove('hidden');
+        this.renderHistoryList();
+        this.updateHistoryStats();
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    }
+
+    hideHistory() {
+        this.isHistoryVisible = false;
+        this.elements.historyPanel.classList.add('hidden');
+        document.body.style.overflow = ''; // Restore scrolling
+    }
+
+    renderHistoryList() {
+        if (!this.elements.historyList) return;
+
+        if (this.translationHistory.length === 0) {
+            this.elements.historyList.innerHTML = `
+                <div class="no-history">
+                    <i class="fas fa-inbox"></i>
+                    <p>No translations in history yet</p>
+                    <small>Your translation history will appear here</small>
+                </div>
+            `;
+            return;
+        }
+
+        const historyHTML = this.translationHistory.map(item => this.createHistoryItemHTML(item)).join('');
+        this.elements.historyList.innerHTML = historyHTML;
+
+        // Add event listeners to history item actions
+        this.setupHistoryItemListeners();
+    }
+
+    createHistoryItemHTML(item) {
+        const date = new Date(item.timestamp);
+        const timeAgo = this.getTimeAgo(date);
+        const confidence = item.confidence ? ` (${Math.round(item.confidence * 100)}%)` : '';
+
+        return `
+            <div class="history-item" data-id="${item.id}">
+                <div class="history-item-header">
+                    <span class="history-timestamp">${timeAgo}</span>
+                    <span class="history-languages">${item.sourceLanguageName} → ${item.targetLanguageName}${confidence}</span>
+                </div>
+                <div class="history-content-text">
+                    <div class="history-original">${this.escapeHtml(item.originalText)}</div>
+                    <div class="history-translation">${this.escapeHtml(item.translatedText)}</div>
+                </div>
+                <div class="history-item-actions">
+                    <button class="action-btn copy-original" title="Copy original text" data-text="${this.escapeHtml(item.originalText)}">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                    <button class="action-btn copy-translation" title="Copy translation" data-text="${this.escapeHtml(item.translatedText)}">
+                        <i class="fas fa-clipboard"></i>
+                    </button>
+                    <button class="action-btn speak-translation" title="Speak translation" data-text="${this.escapeHtml(item.translatedText)}" data-lang="${item.targetLang}">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                    <button class="action-btn delete-item" title="Delete this item" data-id="${item.id}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    setupHistoryItemListeners() {
+        // Copy original text
+        document.querySelectorAll('.history-item .copy-original').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const text = e.target.closest('button').dataset.text;
+                this.copyTextToClipboard(text);
+                this.showSuccessAnimation(e.target.closest('button'));
+            });
+        });
+
+        // Copy translation
+        document.querySelectorAll('.history-item .copy-translation').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const text = e.target.closest('button').dataset.text;
+                this.copyTextToClipboard(text);
+                this.showSuccessAnimation(e.target.closest('button'));
+            });
+        });
+
+        // Speak translation
+        document.querySelectorAll('.history-item .speak-translation').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const button = e.target.closest('button');
+                const text = button.dataset.text;
+                const lang = button.dataset.lang;
+                this.speakHistoryText(text, lang);
+                this.showSuccessAnimation(button);
+            });
+        });
+
+        // Delete item
+        document.querySelectorAll('.history-item .delete-item').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const id = parseInt(e.target.closest('button').dataset.id);
+                this.deleteHistoryItem(id);
+            });
+        });
+    }
+
+    deleteHistoryItem(id) {
+        this.translationHistory = this.translationHistory.filter(item => item.id !== id);
+        this.saveTranslationHistory();
+        this.updateHistoryStats();
+        this.renderHistoryList();
+        this.updateStatus('History item deleted');
+    }
+
+    updateHistoryStats() {
+        if (this.elements.historyCount) {
+            const count = this.translationHistory.length;
+            this.elements.historyCount.textContent = `${count} translation${count !== 1 ? 's' : ''}`;
+        }
+
+        if (this.elements.historySize) {
+            const sizeBytes = new Blob([JSON.stringify(this.translationHistory)]).size;
+            const sizeKB = Math.round(sizeBytes / 1024 * 100) / 100;
+            this.elements.historySize.textContent = `${sizeKB} KB`;
+        }
+    }
+
+    // Enhanced Copy-to-Clipboard
+    async copyTextToClipboard(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            this.updateStatus('Text copied to clipboard');
+            return true;
+        } catch (error) {
+            console.error('Copy failed:', error);
+            this.updateStatus('Failed to copy text');
+            return false;
+        }
+    }
+
+    // Clear individual input
+    clearInput() {
+        this.finalTranscript = '';
+        this.interimTranscript = '';
+        this.showSpeechPlaceholder();
+        this.updateStatus('Input text cleared');
+        this.showSuccessAnimation(this.elements.clearInputBtn);
+    }
+
+    // Enhanced copy-to-clipboard with visual feedback
+    async copyToClipboard(area) {
+        const targetElement = area === 'input' ? this.elements.speechInput : this.elements.translationOutput;
+        let textContent = targetElement.querySelector('.final-text, .translated-text, .text-content');
+        
+        if (!textContent) {
+            // Try to get any text content
+            textContent = targetElement.textContent?.trim();
+            if (!textContent || textContent === 'Your speech will appear here...' || textContent === 'Translation will appear here...') {
+                this.updateStatus('No text to copy');
+                this.showErrorAnimation(area === 'input' ? this.elements.copyInputBtn : this.elements.copyOutputBtn);
+                return;
+            }
+        } else {
+            textContent = textContent.textContent;
+        }
+
+        const success = await this.copyTextToClipboard(textContent);
+        const button = area === 'input' ? this.elements.copyInputBtn : this.elements.copyOutputBtn;
+        
+        if (success) {
+            this.showSuccessAnimation(button);
+        } else {
+            this.showErrorAnimation(button);
+        }
+    }
+
+    // Text-to-Speech for history items
+    speakHistoryText(text, languageCode) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel(); // Stop any ongoing speech
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = this.getSpeechSynthesisLanguage(languageCode);
+            utterance.rate = 0.8;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+            
+            window.speechSynthesis.speak(utterance);
+            this.updateStatus(`Speaking: ${text.substring(0, 30)}${text.length > 30 ? '...' : ''}`);
+        } else {
+            this.updateStatus('Speech synthesis not supported');
+        }
+    }
+
+    getSpeechSynthesisLanguage(langCode) {
+        const mapping = {
+            'en': 'en-US',
+            'es': 'es-ES',
+            'fr': 'fr-FR',
+            'de': 'de-DE',
+            'it': 'it-IT',
+            'pt': 'pt-PT',
+            'hi': 'hi-IN',
+            'zh': 'zh-CN',
+            'ja': 'ja-JP',
+            'ko': 'ko-KR',
+            'ar': 'ar-SA',
+            'ru': 'ru-RU'
+        };
+        return mapping[langCode] || 'en-US';
+    }
+
+    // Tooltip System
+    initializeTooltips() {
+        // Add tooltips to elements with title attributes
+        document.querySelectorAll('[title]').forEach(element => {
+            this.addTooltipToElement(element);
+        });
+    }
+
+    addTooltipToElement(element) {
+        element.addEventListener('mouseenter', (e) => {
+            this.showTooltip(e.target, e.target.getAttribute('title'));
+        });
+
+        element.addEventListener('mouseleave', () => {
+            this.hideTooltip();
+        });
+
+        // Remove the default tooltip
+        element.removeAttribute('title');
+        element.dataset.tooltip = element.getAttribute('title') || element.dataset.tooltip;
+    }
+
+    showTooltip(element, text) {
+        if (!this.elements.tooltip || !text) return;
+
+        this.elements.tooltip.querySelector('.tooltip-content').textContent = text;
+        this.elements.tooltip.classList.remove('hidden');
+
+        // Position tooltip
+        const rect = element.getBoundingClientRect();
+        const tooltip = this.elements.tooltip;
+        
+        // Default to bottom position
+        tooltip.className = 'tooltip tooltip-bottom';
+        tooltip.style.left = `${rect.left + rect.width / 2}px`;
+        tooltip.style.top = `${rect.bottom + 8}px`;
+
+        // Check if tooltip goes off screen and adjust
+        const tooltipRect = tooltip.getBoundingClientRect();
+        if (tooltipRect.bottom > window.innerHeight) {
+            // Switch to top position
+            tooltip.className = 'tooltip tooltip-top';
+            tooltip.style.top = `${rect.top - tooltipRect.height - 8}px`;
+        }
+
+        if (tooltipRect.right > window.innerWidth) {
+            tooltip.style.left = `${window.innerWidth - tooltipRect.width - 10}px`;
+        }
+
+        if (tooltipRect.left < 0) {
+            tooltip.style.left = '10px';
+        }
+    }
+
+    hideTooltip() {
+        if (this.elements.tooltip) {
+            this.elements.tooltip.classList.add('hidden');
+        }
+    }
+
+    // Animation Effects
+    showSuccessAnimation(element) {
+        if (!element) return;
+        
+        element.classList.remove('error-flash');
+        element.classList.add('success-flash');
+        
+        setTimeout(() => {
+            element.classList.remove('success-flash');
+        }, 600);
+    }
+
+    showErrorAnimation(element) {
+        if (!element) return;
+        
+        element.classList.remove('success-flash');
+        element.classList.add('error-flash');
+        
+        setTimeout(() => {
+            element.classList.remove('error-flash');
+        }, 600);
+    }
+
+    // Confirmation Dialog
+    showConfirmDialog(message, onConfirm, onCancel = null) {
+        const confirmed = confirm(message);
+        if (confirmed && onConfirm) {
+            onConfirm();
+        } else if (!confirmed && onCancel) {
+            onCancel();
+        }
+    }
+
+    // Utility Methods
+    getTimeAgo(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        
+        return date.toLocaleDateString();
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Override the existing translateText method to add history tracking
+    async translateText(text, sourceLanguage = null, targetLanguage = null) {
+        if (!text || text.trim() === '') {
+            console.warn('No text provided for translation');
+            return null;
+        }
+
+        try {
+            // Show loading state in translation output
+            this.showTranslationLoading();
+
+            const sourceLang = sourceLanguage || this.getSpeechToTranslationLanguage(this.elements.sourceLang.value);
+            const targetLang = targetLanguage || this.elements.targetLang.value;
+
+            console.log('🌍 Translating:', {
+                text: text.substring(0, 50) + (text.length > 50 ? '...' : ''),
+                from: sourceLang,
+                to: targetLang
+            });
+
+            const response = await fetch('/translate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: text,
+                    source: sourceLang === 'auto' ? undefined : sourceLang,
+                    target: targetLang
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Translation failed');
+            }
+
+            const result = await response.json();
+            console.log('✅ Translation successful:', result);
+
+            // Display the translation
+            this.displayTranslationResult(result.translatedText);
+
+            // Add to history automatically
+            this.addToHistory(
+                text,
+                result.translatedText,
+                result.sourceLanguage,
+                result.targetLanguage
+            );
+
+            this.updateStatus(`Translation complete: ${sourceLang} → ${targetLang}`);
+            return result;
+
+        } catch (error) {
+            console.error('❌ Translation error:', error);
+            this.showTranslationError(error.message);
+            this.updateStatus(`Translation failed: ${error.message}`);
+            return null;
+        }
+    }
+
+    showTranslationLoading() {
+        this.elements.translationOutput.innerHTML = `
+            <div class="loading-state">
+                <div class="loading-spinner">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </div>
+                <p>Translating...</p>
+                <small>Processing your text</small>
+            </div>
+        `;
+        this.elements.translationOutput.classList.add('loading');
+    }
+
+    displayTranslationResult(translatedText) {
+        this.elements.translationOutput.classList.remove('loading');
+        this.elements.translationOutput.innerHTML = `
+            <div class="translation-result">
+                <span class="translated-text">${translatedText}</span>
+                <div class="translation-info">
+                    <small><i class="fas fa-check-circle"></i> Translation complete</small>
+                </div>
+            </div>
+        `;
+        this.elements.translationOutput.classList.add('has-content');
+    }
+
+    showTranslationError(errorMessage) {
+        this.elements.translationOutput.classList.remove('loading');
+        this.elements.translationOutput.innerHTML = `
+            <div class="error-state">
+                <div class="error-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <p>Translation Failed</p>
+                <small>${errorMessage}</small>
+                <button class="retry-btn" onclick="window.speechTranslator.retryLastTranslation()">
+                    <i class="fas fa-redo"></i> Retry
+                </button>
+            </div>
+        `;
+    }
+
+    retryLastTranslation() {
+        const lastText = this.finalTranscript || this.elements.speechInput.textContent?.trim();
+        if (lastText && lastText !== 'Your speech will appear here...') {
+            this.translateText(lastText);
+        } else {
+            this.updateStatus('No text to retry translation');
+        }
     }
 }
 

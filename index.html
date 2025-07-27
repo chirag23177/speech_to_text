@@ -199,10 +199,13 @@
                     
                     <!-- Quick Actions -->
                     <div class="quick-actions">
-                        <button class="quick-btn" id="clear-all" title="Clear all text" aria-label="Clear All Text">
+                        <button class="quick-btn" id="clear-all" title="Clear all text (Ctrl+Shift+C)" aria-label="Clear All Text">
                             <i class="fas fa-trash-alt"></i>
                         </button>
-                        <button class="quick-btn" id="settings-btn" title="Settings" aria-label="Settings">
+                        <button class="quick-btn" id="history-btn" title="Translation history (Ctrl+H)" aria-label="Translation History">
+                            <i class="fas fa-history"></i>
+                        </button>
+                        <button class="quick-btn" id="settings-btn" title="Settings (Ctrl+,)" aria-label="Settings">
                             <i class="fas fa-cog"></i>
                         </button>
                     </div>
@@ -220,8 +223,11 @@
                                 <i class="fas fa-signal"></i>
                                 <span class="confidence-text">--</span>
                             </span>
-                            <button class="copy-btn" id="copy-input" title="Copy text" aria-label="Copy Input Text">
+                            <button class="copy-btn" id="copy-input" title="Copy text (Ctrl+C)" aria-label="Copy Input Text">
                                 <i class="fas fa-copy"></i>
+                            </button>
+                            <button class="action-btn" id="clear-input" title="Clear input text (Ctrl+Shift+I)" aria-label="Clear Input">
+                                <i class="fas fa-eraser"></i>
                             </button>
                         </div>
                     </div>
@@ -245,11 +251,14 @@
                     <div class="area-header">
                         <h3><i class="fas fa-globe"></i> Translation</h3>
                         <div class="header-actions">
-                            <button class="speak-btn" id="speak-output" title="Read translation aloud" aria-label="Speak Translation">
+                            <button class="speak-btn" id="speak-output" title="Read translation aloud (Ctrl+R)" aria-label="Speak Translation">
                                 <i class="fas fa-volume-up"></i>
                             </button>
-                            <button class="copy-btn" id="copy-output" title="Copy translation" aria-label="Copy Translation">
+                            <button class="copy-btn" id="copy-output" title="Copy translation (Ctrl+Shift+C)" aria-label="Copy Translation">
                                 <i class="fas fa-copy"></i>
+                            </button>
+                            <button class="action-btn" id="save-translation" title="Save to history (Ctrl+S)" aria-label="Save Translation">
+                                <i class="fas fa-bookmark"></i>
                             </button>
                         </div>
                     </div>
@@ -274,6 +283,55 @@
         <footer class="footer">
             <p>&copy; 2025 Real-Time Speech Translator | Built with Web APIs</p>
         </footer>
+    </div>
+
+    <!-- Translation History Panel -->
+    <div id="history-panel" class="history-panel hidden">
+        <div class="history-content">
+            <div class="history-header">
+                <h2><i class="fas fa-history"></i> Translation History</h2>
+                <div class="history-actions">
+                    <button class="action-btn" id="export-history" title="Export history as JSON" aria-label="Export History">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="action-btn" id="clear-history" title="Clear all history" aria-label="Clear History">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                    <button class="close-btn" id="close-history" title="Close history panel" aria-label="Close History">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="history-body">
+                <div class="history-list" id="history-list">
+                    <div class="no-history">
+                        <i class="fas fa-inbox"></i>
+                        <p>No translations in history yet</p>
+                        <small>Your translation history will appear here</small>
+                    </div>
+                </div>
+            </div>
+            <div class="history-footer">
+                <div class="history-stats">
+                    <span id="history-count">0 translations</span>
+                    <span class="separator">•</span>
+                    <span id="history-size">0 KB</span>
+                </div>
+                <div class="history-shortcuts">
+                    <small>
+                        <kbd>Ctrl+H</kbd> Toggle • 
+                        <kbd>Ctrl+Shift+H</kbd> Clear • 
+                        <kbd>Escape</kbd> Close
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tooltip Container -->
+    <div id="tooltip" class="tooltip hidden" role="tooltip">
+        <div class="tooltip-arrow"></div>
+        <div class="tooltip-content"></div>
     </div>
 
     <!-- Loading Overlay -->
