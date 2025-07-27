@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const speech = require('@google-cloud/speech');
+const { Translate } = require('@google-cloud/translate').v2;
 const http = require('http');
 const socketIo = require('socket.io');
 
@@ -40,6 +41,7 @@ app.use(express.static('.')); // Serve static files from current directory
 
 // Initialize Google Cloud Speech client
 let speechClient;
+let translateClient;
 
 try {
     // Check if credentials.json exists
@@ -48,13 +50,16 @@ try {
         speechClient = new speech.SpeechClient({
             keyFilename: credentialsPath
         });
-        console.log('✅ Google Cloud Speech client initialized with credentials.json');
+        translateClient = new Translate({
+            keyFilename: credentialsPath
+        });
+        console.log('✅ Google Cloud Speech and Translation clients initialized with credentials.json');
     } else {
         console.warn('⚠️ credentials.json not found. Please add your Google Cloud credentials file.');
         console.warn('📖 Instructions: https://cloud.google.com/speech-to-text/docs/before-you-begin');
     }
 } catch (error) {
-    console.error('❌ Failed to initialize Google Cloud Speech client:', error.message);
+    console.error('❌ Failed to initialize Google Cloud clients:', error.message);
 }
 
 // Real-time streaming transcription with Socket.IO
@@ -256,6 +261,7 @@ app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
         speechClientReady: !!speechClient,
+        translateClientReady: !!translateClient,
         timestamp: new Date().toISOString()
     });
 });
@@ -356,6 +362,90 @@ app.post('/transcribe', upload.single('audio'), async (req, res) => {
     }
 });
 
+// Translation endpoint
+app.post('/translate', async (req, res) => {
+    try {
+        // Check if translation client is available
+        if (!translateClient) {
+            return res.status(500).json({
+                error: 'Translation service not available',
+                message: 'Google Cloud Translation client not initialized. Please check credentials.json file.'
+            });
+        }
+
+        // Validate request body
+        const { text, source, target } = req.body;
+
+        if (!text || typeof text !== 'string' || text.trim() === '') {
+            return res.status(400).json({
+                error: 'Invalid text',
+                message: 'Text field is required and must be a non-empty string'
+            });
+        }
+
+        if (!target || typeof target !== 'string') {
+            return res.status(400).json({
+                error: 'Invalid target language',
+                message: 'Target language code is required'
+            });
+        }
+
+        console.log(`🌍 Processing translation:`, {
+            text: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+            source: source || 'auto-detect',
+            target: target
+        });
+
+        // Prepare translation options
+        const options = {
+            to: target
+        };
+
+        // Add source language if specified
+        if (source && source !== 'auto') {
+            options.from = source;
+        }
+
+        // Perform translation
+        const [translation] = await translateClient.translate(text, options);
+
+        console.log(`✅ Translation completed:`, {
+            originalText: text.substring(0, 50) + (text.length > 50 ? '...' : ''),
+            translatedText: translation.substring(0, 50) + (translation.length > 50 ? '...' : ''),
+            target: target
+        });
+
+        res.json({
+            translatedText: translation,
+            sourceLanguage: source || 'auto-detected',
+            targetLanguage: target,
+            originalText: text,
+            timestamp: new Date().toISOString()
+        });
+
+    } catch (error) {
+        console.error('❌ Translation error:', error);
+
+        // Handle specific translation errors
+        let errorMessage = error.message;
+        let statusCode = 500;
+
+        if (error.message.includes('Invalid language')) {
+            errorMessage = 'Invalid language code provided';
+            statusCode = 400;
+        } else if (error.message.includes('quota')) {
+            errorMessage = 'Translation quota exceeded. Please try again later.';
+            statusCode = 429;
+        }
+
+        res.status(statusCode).json({
+            error: 'Translation failed',
+            message: errorMessage,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+});
+
 // Helper function to determine audio encoding
 function getAudioEncoding(mimetype) {
     switch (mimetype) {
@@ -408,9 +498,10 @@ server.listen(PORT, () => {
     console.log(`🚀 Speech-to-Text server running on http://localhost:${PORT}`);
     console.log(`📋 Health check: http://localhost:${PORT}/health`);
     console.log(`🎤 Transcription endpoint: POST http://localhost:${PORT}/transcribe`);
+    console.log(`🌍 Translation endpoint: POST http://localhost:${PORT}/translate`);
     console.log(`🔌 Real-time streaming: Socket.IO enabled`);
     
-    if (!speechClient) {
+    if (!speechClient || !translateClient) {
         console.log('\n⚠️  SETUP REQUIRED:');
         console.log('   1. Add your credentials.json file to this directory');
         console.log('   2. Restart the server');

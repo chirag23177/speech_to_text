@@ -760,6 +760,133 @@ kbd {
     animation: slideInDown 0.5s ease;
 }
 
+/* Translation-specific Loading and Result Styles */
+.loading-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+    animation: fadeIn 0.3s ease;
+}
+
+.loading-state .loading-spinner {
+    background: none;
+    border: none;
+    padding: 0;
+    margin-bottom: 1rem;
+}
+
+.loading-state .loading-spinner i {
+    font-size: 2rem;
+    color: var(--accent-color);
+}
+
+.loading-state p {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.loading-state small {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.translation-result {
+    padding: 1.5rem;
+    animation: fadeInUp 0.5s ease;
+}
+
+.translated-text {
+    display: block;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    border-left: 4px solid var(--success-color);
+}
+
+.translation-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0.5rem;
+}
+
+.translation-info small {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.translation-info i {
+    color: var(--success-color);
+}
+
+.error-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--error-color);
+    animation: fadeIn 0.3s ease;
+}
+
+.error-state .error-icon {
+    margin-bottom: 1rem;
+}
+
+.error-state .error-icon i {
+    font-size: 2rem;
+    color: var(--error-color);
+}
+
+.error-state p {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.error-state small {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.retry-btn {
+    background: linear-gradient(135deg, var(--error-color), #e55a5a);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all var(--transition-fast);
+    margin-top: 0.5rem;
+}
+
+.retry-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(229, 90, 90, 0.3);
+}
+
+.retry-btn:active {
+    transform: translateY(0);
+}
+
+.text-display.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
 /* Error notification variant */
 .security-notification.error-notification {
     background: linear-gradient(135deg, rgba(255, 87, 51, 0.15), rgba(255, 152, 0, 0.15));

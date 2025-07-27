@@ -1752,6 +1752,9 @@ class SpeechTranslator {
         
         // Update status
         this.updateStatus(`Transcription complete (${this.finalTranscript.length} characters)`);
+        
+        // Automatically translate the text
+        this.translateText(this.finalTranscript);
     }
 
     // Show speech input placeholder
@@ -2402,6 +2405,133 @@ class SpeechTranslator {
         alert(settingsInfo);
         
         this.updateStatus('Settings displayed');
+    }
+
+    // Translate text using the backend API
+    async translateText(text, sourceLanguage = null, targetLanguage = null) {
+        if (!text || !text.trim()) {
+            console.warn('No text to translate');
+            return null;
+        }
+
+        try {
+            // Get source and target languages
+            const sourceLang = sourceLanguage || this.getSpeechToTranslationLanguage(this.elements.sourceLang.value);
+            const targetLang = targetLanguage || this.elements.targetLang.value;
+
+            console.log(`🌍 Translating text: "${text.substring(0, 50)}..." from ${sourceLang} to ${targetLang}`);
+
+            // Show translation loading state
+            this.showTranslationLoading();
+
+            // Call the backend translation API
+            const response = await fetch('http://localhost:3001/translate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: text,
+                    source: sourceLang,
+                    target: targetLang
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `Translation failed: ${response.status}`);
+            }
+
+            const translationData = await response.json();
+            console.log('✅ Translation successful:', translationData);
+
+            // Display the translation
+            this.displayTranslation(translationData.translatedText, translationData.sourceLanguage, translationData.targetLanguage);
+
+            return translationData.translatedText;
+
+        } catch (error) {
+            console.error('❌ Translation error:', error);
+            this.showTranslationError(error.message);
+            return null;
+        }
+    }
+
+    // Convert speech recognition language code to translation language code
+    getSpeechToTranslationLanguage(speechLangCode) {
+        const mapping = {
+            'en-US': 'en',
+            'es-ES': 'es',
+            'fr-FR': 'fr',
+            'de-DE': 'de',
+            'it-IT': 'it',
+            'pt-PT': 'pt',
+            'hi-IN': 'hi',
+            'zh-CN': 'zh',
+            'ja-JP': 'ja',
+            'ko-KR': 'ko',
+            'ar-SA': 'ar'
+        };
+        return mapping[speechLangCode] || 'en';
+    }
+
+    // Show translation loading state
+    showTranslationLoading() {
+        this.elements.translationOutput.innerHTML = `
+            <div class="loading-state">
+                <div class="loading-spinner">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </div>
+                <p>Translating...</p>
+                <small>Please wait while we translate your text</small>
+            </div>
+        `;
+        this.elements.translationOutput.classList.add('loading');
+    }
+
+    // Display translation result
+    displayTranslation(translatedText, sourceLanguage, targetLanguage) {
+        this.elements.translationOutput.classList.remove('loading');
+        this.elements.translationOutput.innerHTML = `
+            <div class="translation-result">
+                <span class="translated-text">${translatedText}</span>
+                <div class="translation-info">
+                    <small>
+                        <i class="fas fa-language"></i>
+                        Translated from ${sourceLanguage} to ${targetLanguage}
+                    </small>
+                </div>
+            </div>
+        `;
+        this.elements.translationOutput.classList.add('has-content');
+
+        // Update status
+        this.updateStatus(`Translation complete (${translatedText.length} characters)`);
+    }
+
+    // Show translation error
+    showTranslationError(errorMessage) {
+        this.elements.translationOutput.classList.remove('loading');
+        this.elements.translationOutput.innerHTML = `
+            <div class="error-state">
+                <div class="error-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <p>Translation failed</p>
+                <small>${errorMessage}</small>
+                <button class="retry-btn" onclick="speechTranslator.retryTranslation()">
+                    <i class="fas fa-redo"></i> Retry
+                </button>
+            </div>
+        `;
+        this.updateStatus(`Translation error: ${errorMessage}`);
+    }
+
+    // Retry translation
+    retryTranslation() {
+        if (this.finalTranscript) {
+            this.translateText(this.finalTranscript);
+        }
     }
 
     // Get current configuration
