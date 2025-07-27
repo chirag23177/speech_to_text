@@ -109,9 +109,10 @@ curl -X POST http://localhost:3001/transcribe \
 
 2. **Test Recording:**
    - Click the microphone button
-   - Speak clearly for 2-3 seconds
-   - Stop speaking and wait for transcription
-   - The app automatically processes after 2 seconds of silence
+   - Speak clearly and continuously
+   - See real-time transcription appearing as you speak
+   - Interim text appears in italic, final text becomes bold
+   - Real-time streaming provides immediate feedback
 
 ## 🔧 Configuration Options
 
@@ -128,6 +129,9 @@ const credentialsPath = path.join(__dirname, 'credentials.json');
 limits: {
     fileSize: 10 * 1024 * 1024, // 10MB
 }
+
+// Control debug logging levels
+// Reduce audio chunk logging for cleaner console output
 ```
 
 ### Frontend Configuration (script.js)
@@ -136,9 +140,12 @@ limits: {
 // Change backend URL
 this.backendUrl = 'http://localhost:3001';
 
-// Adjust silence detection
+// Real-time streaming settings
+this.isStreamingMode = true; // Enable real-time streaming
+this.recordingChunkSize = 250; // 250ms chunks for low latency
+
+// Audio visualization settings
 this.silenceThreshold = 0.01; // Lower = more sensitive
-this.maxSilenceDuration = 2000; // 2 seconds
 ```
 
 ## 🐛 Troubleshooting

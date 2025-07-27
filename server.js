@@ -4,8 +4,17 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const speech = require('@google-cloud/speech');
+const http = require('http');
+const socketIo = require('socket.io');
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
 const PORT = process.env.PORT || 3001;
 
 // Configure multer for handling file uploads
@@ -47,6 +56,200 @@ try {
 } catch (error) {
     console.error('❌ Failed to initialize Google Cloud Speech client:', error.message);
 }
+
+// Real-time streaming transcription with Socket.IO
+io.on('connection', (socket) => {
+    console.log('🔌 Client connected for streaming:', socket.id);
+    
+    let recognizeStream = null;
+    let isStreamActive = false;
+    
+    // Start streaming transcription
+    socket.on('start-stream', (config) => {
+        try {
+            if (!speechClient) {
+                socket.emit('error', {
+                    message: 'Speech recognition service not available'
+                });
+                return;
+            }
+            
+            if (isStreamActive && recognizeStream) {
+                recognizeStream.end();
+            }
+            
+            const language = config.language || 'en-US';
+            const sampleRate = config.sampleRate || 48000;
+            
+            console.log(`🎤 Starting streaming recognition:`, {
+                language,
+                sampleRate,
+                socketId: socket.id
+            });
+            
+            // Configure streaming request with proper audio settings
+            const request = {
+                config: {
+                    encoding: 'WEBM_OPUS', // Browser MediaRecorder typically uses WEBM with Opus codec
+                    sampleRateHertz: sampleRate,
+                    languageCode: language,
+                    enableAutomaticPunctuation: true,
+                    enableWordTimeOffsets: false,
+                    model: 'latest_long',
+                    useEnhanced: true,
+                    maxAlternatives: 1,
+                    audioChannelCount: 1, // Mono audio
+                    enableSeparateRecognitionPerChannel: false
+                },
+                interimResults: true,
+                enableVoiceActivityEvents: true,
+                voiceActivityTimeout: {
+                    speechStartTimeout: {
+                        seconds: 5,
+                        nanos: 0
+                    },
+                    speechEndTimeout: {
+                        seconds: 2,
+                        nanos: 0
+                    }
+                }
+            };
+            
+            // Create streaming recognition with better error handling
+            try {
+                recognizeStream = speechClient
+                    .streamingRecognize(request)
+                    .on('error', (error) => {
+                        console.error('❌ Streaming recognition error:', error);
+                        
+                        // Send specific error messages to client
+                        let errorMessage = 'Streaming transcription failed';
+                        if (error.code === 1) {
+                            errorMessage = 'Stream was cancelled - audio format may be incompatible';
+                        } else if (error.code === 3) {
+                            errorMessage = 'Invalid audio format - check encoding settings';
+                        } else if (error.code === 11) {
+                            errorMessage = 'Audio processing failed - check audio quality';
+                        }
+                        
+                        socket.emit('streaming-error', {
+                            message: errorMessage,
+                            code: error.code,
+                            details: error.details
+                        });
+                        isStreamActive = false;
+                    })
+                    .on('data', (response) => {
+                        // Handle streaming results
+                        if (response.results && response.results.length > 0) {
+                        const result = response.results[0];
+                        const transcript = result.alternatives[0].transcript;
+                        const confidence = result.alternatives[0].confidence || 0;
+                        const isFinal = result.isFinal;
+                        
+                        // Reduced logging - only log final results to reduce clutter
+                        if (isFinal) {
+                            console.log(`✅ Final transcription:`, transcript.substring(0, 100) + (transcript.length > 100 ? '...' : ''));
+                        }
+                        
+                        // Emit real-time result to frontend
+                        socket.emit('transcription-result', {
+                            transcript: transcript,
+                            confidence: confidence,
+                            isFinal: isFinal,
+                            timestamp: Date.now()
+                        });
+                    }
+                    
+                    // Handle voice activity events
+                    if (response.speechEventType) {
+                        socket.emit('voice-activity', {
+                            event: response.speechEventType,
+                            timestamp: Date.now()
+                        });
+                    }
+                })
+                .on('end', () => {
+                    console.log('🔚 Streaming recognition ended');
+                    isStreamActive = false;
+                    socket.emit('stream-ended');
+                });
+            
+                isStreamActive = true;
+                socket.emit('stream-started');
+                
+            } catch (streamError) {
+                console.error('❌ Failed to create streaming recognition:', streamError);
+                socket.emit('streaming-error', {
+                    message: `Failed to initialize stream: ${streamError.message}`,
+                    code: streamError.code
+                });
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to start streaming recognition:', error);
+            socket.emit('streaming-error', {
+                message: `Failed to start streaming: ${error.message}`
+            });
+        }
+    });
+    
+    // Receive audio data from client
+    socket.on('audio-data', (audioChunk) => {
+        if (recognizeStream && isStreamActive) {
+            try {
+                // Handle different audio data formats
+                let audioBuffer;
+                
+                if (Buffer.isBuffer(audioChunk)) {
+                    // Already a buffer
+                    audioBuffer = audioChunk;
+                } else if (typeof audioChunk === 'string') {
+                    // Base64 encoded string
+                    audioBuffer = Buffer.from(audioChunk, 'base64');
+                } else if (audioChunk instanceof ArrayBuffer) {
+                    // ArrayBuffer from client
+                    audioBuffer = Buffer.from(audioChunk);
+                } else {
+                    // Assume it's a Blob/binary data
+                    audioBuffer = Buffer.from(audioChunk);
+                }
+                
+                // Only write if we have data
+                if (audioBuffer && audioBuffer.length > 0) {
+                    recognizeStream.write(audioBuffer);
+                    // Reduced logging - only log periodically to avoid spam
+                    if (Math.random() < 0.1) { // Log ~10% of chunks
+                        console.log(`📊 Audio streaming: ${audioBuffer.length} bytes`);
+                    }
+                } else {
+                    console.warn('⚠️ Empty audio chunk received');
+                }
+            } catch (error) {
+                console.error('❌ Error writing audio data:', error);
+                socket.emit('streaming-error', { message: error.message });
+            }
+        }
+    });
+    
+    // Stop streaming
+    socket.on('stop-stream', () => {
+        console.log('🛑 Client requested stop streaming');
+        if (recognizeStream && isStreamActive) {
+            recognizeStream.end();
+            isStreamActive = false;
+        }
+    });
+    
+    // Handle client disconnect
+    socket.on('disconnect', () => {
+        console.log('🔌 Client disconnected:', socket.id);
+        if (recognizeStream && isStreamActive) {
+            recognizeStream.end();
+            isStreamActive = false;
+        }
+    });
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -201,10 +404,11 @@ app.use('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`🚀 Speech-to-Text server running on http://localhost:${PORT}`);
     console.log(`📋 Health check: http://localhost:${PORT}/health`);
     console.log(`🎤 Transcription endpoint: POST http://localhost:${PORT}/transcribe`);
+    console.log(`🔌 Real-time streaming: Socket.IO enabled`);
     
     if (!speechClient) {
         console.log('\n⚠️  SETUP REQUIRED:');
@@ -214,4 +418,4 @@ app.listen(PORT, () => {
     }
 });
 
-module.exports = app;
+module.exports = { app, server };

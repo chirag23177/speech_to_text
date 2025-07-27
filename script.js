@@ -29,6 +29,11 @@ class SpeechTranslator {
         this.silenceTimer = null;
         this.maxSilenceDuration = 2000; // 2 seconds of silence before processing
         
+        // Socket.IO Real-time Streaming Properties
+        this.socket = null;
+        this.streamingActive = false;
+        this.isStreamingMode = true; // Use real-time streaming instead of batch processing
+        
         this.currentLanguages = {
             source: 'en-US',
             target: 'es'
@@ -176,6 +181,7 @@ class SpeechTranslator {
         this.checkBrowserSupport();
         this.checkMicrophonePermission();
         this.showSpeechPlaceholder(); // Part 3.1: Show initial placeholder
+        this.initializeSocketIO(); // Initialize real-time streaming
         console.log('Speech Translator initialized successfully');
     }
 
@@ -653,7 +659,11 @@ class SpeechTranslator {
             
             // Initialize audio recording for Google Cloud Speech
             if (this.isGoogleCloudMode && this.recognitionSupported) {
-                await this.startGoogleCloudRecording();
+                if (this.isStreamingMode) {
+                    await this.startStreamingRecording();
+                } else {
+                    await this.startGoogleCloudRecording();
+                }
             } else if (this.recognitionSupported) {
                 // Fallback to Web Speech API
                 this.startSpeechRecognition();
@@ -691,7 +701,11 @@ class SpeechTranslator {
         try {
             // Stop Google Cloud recording first
             if (this.isGoogleCloudMode && this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-                this.stopGoogleCloudRecording();
+                if (this.isStreamingMode) {
+                    this.stopStreamingRecording();
+                } else {
+                    this.stopGoogleCloudRecording();
+                }
             } else if (this.recognitionSupported) {
                 // Fallback to Web Speech API
                 this.stopSpeechRecognition();
@@ -1158,6 +1172,231 @@ class SpeechTranslator {
         
         // Fallback - let MediaRecorder choose
         return '';
+    }
+
+    // ========================================
+    // SOCKET.IO REAL-TIME STREAMING METHODS
+    // ========================================
+
+    // Initialize Socket.IO connection for real-time streaming
+    initializeSocketIO() {
+        try {
+            this.socket = io(this.backendUrl, {
+                transports: ['websocket', 'polling'],
+                timeout: 5000,
+                autoConnect: true
+            });
+
+            this.setupSocketEvents();
+            console.log('✅ Socket.IO client initialized for real-time streaming');
+        } catch (error) {
+            console.error('❌ Failed to initialize Socket.IO:', error);
+            this.updateStatus('Real-time streaming unavailable - check backend connection');
+        }
+    }
+
+    // Set up Socket.IO event handlers
+    setupSocketEvents() {
+        if (!this.socket) return;
+
+        // Connection events
+        this.socket.on('connect', () => {
+            console.log('✅ Connected to real-time streaming backend');
+            this.updateStatus('Connected to real-time streaming');
+        });
+
+        this.socket.on('disconnect', (reason) => {
+            console.log('❌ Disconnected from streaming backend:', reason);
+            this.updateStatus('Disconnected from streaming backend');
+            this.streamingActive = false;
+        });
+
+        this.socket.on('connect_error', (error) => {
+            console.error('Socket.IO connection error:', error);
+            this.updateStatus('Connection error - check backend server');
+        });
+
+        // Real-time transcription events
+        this.socket.on('transcription-result', (data) => {
+            // Only log final results to reduce console clutter
+            if (data.isFinal) {
+                console.log('✅ Final transcription received:', data.transcript.substring(0, 50) + (data.transcript.length > 50 ? '...' : ''));
+            }
+            this.handleStreamingResult(data);
+        });
+
+        this.socket.on('voice-activity', (data) => {
+            this.handleVoiceActivity(data);
+        });
+
+        this.socket.on('streaming-error', (error) => {
+            console.error('Streaming error:', error);
+            this.handleSpeechError({ 
+                error: 'streaming-error', 
+                message: error.message || 'Streaming transcription failed' 
+            });
+        });
+
+        this.socket.on('stream-ended', () => {
+            console.log('Stream ended by server');
+            this.stopStreamingRecording();
+        });
+    }
+
+    // Start real-time streaming recognition
+    async startStreamingRecording() {
+        if (!this.socket || !this.socket.connected) {
+            console.error('Socket.IO not connected');
+            this.updateStatus('Cannot start streaming - no backend connection');
+            return;
+        }
+
+        try {
+            // Configure MediaRecorder for real-time streaming
+            const mimeType = this.getSupportedMimeType();
+            this.mediaRecorder = new MediaRecorder(this.mediaStream, {
+                mimeType: mimeType
+            });
+
+            // Configure for real-time data
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0 && this.streamingActive) {
+                    // Convert Blob to ArrayBuffer for Socket.IO transmission
+                    event.data.arrayBuffer().then(arrayBuffer => {
+                        this.socket.emit('audio-data', arrayBuffer);
+                        // Reduced logging to avoid console spam
+                        if (Math.random() < 0.05) { // Log ~5% of chunks
+                            console.log(`📊 Audio streaming: ${arrayBuffer.byteLength} bytes`);
+                        }
+                    }).catch(error => {
+                        console.error('Failed to convert audio data:', error);
+                    });
+                }
+            };
+
+            this.mediaRecorder.onerror = (event) => {
+                console.error('MediaRecorder error:', event.error);
+                this.handleSpeechError({ error: 'recording-error', message: event.error.message });
+            };
+
+            // Start streaming session with proper audio configuration
+            this.socket.emit('start-stream', {
+                language: this.currentLanguages.source,
+                sampleRate: 48000, // Browser default sample rate
+                config: {
+                    encoding: this.getAudioEncoding(mimeType),
+                    sampleRateHertz: 48000, // Match browser output
+                    languageCode: this.currentLanguages.source,
+                    enableAutomaticPunctuation: true,
+                    enableWordTimeOffsets: false,
+                    maxAlternatives: 1,
+                    model: 'latest_long'
+                }
+            });
+
+            // Add a small delay before starting recording to allow stream setup
+            setTimeout(() => {
+                if (this.streamingActive) {
+                    // Start recording with frequent data chunks for real-time streaming
+                    this.mediaRecorder.start(250); // 250ms chunks for low latency
+                    this.recognitionActive = true;
+
+                    console.log('✅ Real-time streaming started:', {
+                        mimeType: mimeType,
+                        language: this.currentLanguages.source
+                    });
+                }
+            }, 100); // 100ms delay to ensure stream is ready
+
+            this.streamingActive = true;
+
+        } catch (error) {
+            console.error('Failed to start streaming recording:', error);
+            this.handleSpeechError({ error: 'streaming-setup-failed', message: error.message });
+        }
+    }
+
+    // Stop real-time streaming recognition
+    stopStreamingRecording() {
+        try {
+            if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                this.mediaRecorder.stop();
+            }
+
+            if (this.socket && this.streamingActive) {
+                this.socket.emit('stop-stream');
+            }
+
+            this.streamingActive = false;
+            this.recognitionActive = false;
+
+            console.log('✅ Real-time streaming stopped');
+        } catch (error) {
+            console.error('Failed to stop streaming recording:', error);
+        }
+    }
+
+    // Handle real-time streaming results
+    handleStreamingResult(data) {
+        const { transcript, confidence, isFinal } = data;
+
+        if (isFinal) {
+            // Final result - add to final transcript
+            if (transcript && transcript.trim()) {
+                this.finalTranscript += (this.finalTranscript ? ' ' : '') + transcript.trim();
+                this.interimTranscript = '';
+                
+                this.displayFinalSpeechResult();
+                
+                // Update status with confidence
+                const confidencePercent = Math.round((confidence || 0) * 100);
+                this.updateStatus(`Live transcription (${confidencePercent}% confidence)`);
+            }
+        } else {
+            // Interim result - update interim transcript
+            this.interimTranscript = transcript || '';
+            this.displayInterimSpeechResult();
+        }
+    }
+
+    // Handle voice activity detection
+    handleVoiceActivity(data) {
+        const { speaking, level } = data;
+        
+        // Update audio visualization based on voice activity
+        if (speaking) {
+            this.updateStatus('Listening... (speaking detected)');
+        } else {
+            this.updateStatus('Listening... (silent)');
+        }
+    }
+
+    // Get audio encoding from MIME type
+    getAudioEncoding(mimeType) {
+        if (mimeType.includes('opus')) {
+            return 'WEBM_OPUS';
+        } else if (mimeType.includes('webm')) {
+            return 'WEBM_OPUS';
+        } else if (mimeType.includes('ogg')) {
+            return 'OGG_OPUS';
+        } else {
+            return 'WEBM_OPUS'; // Default fallback
+        }
+    }
+
+    // Display interim speech results for real-time feedback
+    displayInterimSpeechResult() {
+        if (!this.elements.speechInput) return;
+
+        const combined = this.finalTranscript + (this.interimTranscript ? ' ' + this.interimTranscript : '');
+        
+        this.elements.speechInput.innerHTML = `
+            <span class="final-text">${this.finalTranscript}</span>
+            ${this.interimTranscript ? `<span class="interim-text">${this.interimTranscript}</span>` : ''}
+        `;
+        
+        // Auto-scroll to bottom
+        this.elements.speechInput.scrollTop = this.elements.speechInput.scrollHeight;
     }
 
     // ========================================
