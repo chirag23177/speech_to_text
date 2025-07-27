@@ -1771,3 +1771,185 @@ kbd {
         font-size: 0.7rem;
     }
 }
+
+/* ============================================
+   PERFORMANCE DASHBOARD STYLES - Phase 6.1
+   ============================================ */
+
+.performance-section {
+    position: relative;
+    margin: 1rem 0;
+}
+
+.performance-dashboard {
+    position: relative;
+    display: inline-block;
+}
+
+.performance-toggle-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 0.75rem 1rem;
+    border-radius: 50px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+}
+
+.performance-toggle-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+}
+
+.performance-indicator {
+    animation: pulse 2s infinite;
+    font-size: 1.1rem;
+}
+
+.performance-panel {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    min-width: 600px;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    margin-top: 1rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    border: 1px solid #e1e5e9;
+}
+
+.performance-panel.hidden {
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+}
+
+.performance-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.performance-header h3 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+    flex-grow: 1;
+}
+
+.close-performance-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 50%;
+    transition: background-color 0.2s ease;
+}
+
+.close-performance-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.performance-content {
+    padding: 1.5rem;
+}
+
+.performance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.metric-card {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 1rem;
+    text-align: center;
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.metric-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #495057;
+}
+
+.performance-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.clear-cache-btn {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+}
+
+.refresh-stats-btn {
+    background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+}
+
+.clear-cache-btn:hover,
+.refresh-stats-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Responsive design for performance dashboard */
+@media (max-width: 768px) {
+    .performance-panel {
+        min-width: 100%;
+        left: -50%;
+        right: -50%;
+    }
+    
+    .performance-grid {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 0.75rem;
+    }
+    
+    .metric-card {
+        padding: 0.75rem;
+    }
+    
+    .metric-value {
+        font-size: 1.2rem;
+    }
+    
+    .performance-actions {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+}

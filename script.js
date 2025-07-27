@@ -51,6 +51,27 @@ class SpeechTranslator {
         this.maxHistoryItems = 100;
         this.tooltipTimeout = null;
         this.isHistoryVisible = false;
+        this.isPerformanceDashboardVisible = false;
+        
+        // Performance Optimization Properties - Phase 6.1
+        this.translationCache = new Map();
+        this.maxCacheSize = 500;
+        this.apiCallQueue = [];
+        this.isProcessingQueue = false;
+        this.lastApiCall = 0;
+        this.minApiInterval = 500; // Minimum 500ms between API calls
+        this.performanceMetrics = {
+            startTime: Date.now(),
+            totalTranslations: 0,
+            cacheHits: 0,
+            cacheMisses: 0,
+            apiCalls: 0,
+            averageLatency: 0,
+            totalLatency: 0
+        };
+        this.pendingTranslations = new Set();
+        this.debounceTimer = null;
+        this.debounceDelay = 1000; // 1 second debounce for real-time translation
         
         this.initializeElements();
         this.setupEventListeners();
@@ -89,7 +110,20 @@ class SpeechTranslator {
             saveTranslationBtn: document.getElementById('save-translation'),
             historyCount: document.getElementById('history-count'),
             historySize: document.getElementById('history-size'),
-            tooltip: document.getElementById('tooltip')
+            tooltip: document.getElementById('tooltip'),
+            // Performance dashboard elements
+            performanceToggleBtn: document.getElementById('performance-toggle-btn'),
+            performancePanel: document.getElementById('performance-panel'),
+            closePerformanceBtn: document.getElementById('close-performance-btn'),
+            clearCacheBtn: document.getElementById('clear-cache-btn'),
+            refreshStatsBtn: document.getElementById('refresh-stats-btn'),
+            totalTranslations: document.getElementById('total-translations'),
+            cacheHitRate: document.getElementById('cache-hit-rate'),
+            averageLatency: document.getElementById('average-latency'),
+            apiCalls: document.getElementById('api-calls'),
+            cacheSize: document.getElementById('cache-size'),
+            queueSize: document.getElementById('queue-size'),
+            performanceIndicator: document.getElementById('performance-indicator')
         };
     }
 
@@ -186,6 +220,12 @@ class SpeechTranslator {
                 this.clearHistory();
             }
             
+            // Performance dashboard
+            if (e.code === 'KeyP' && e.ctrlKey) {
+                e.preventDefault();
+                this.togglePerformanceDashboard();
+            }
+            
             // Copy controls
             if (e.code === 'KeyC' && e.ctrlKey && e.shiftKey) {
                 e.preventDefault();
@@ -270,6 +310,9 @@ class SpeechTranslator {
         this.showSpeechPlaceholder(); // Part 3.1: Show initial placeholder
         this.initializeSocketIO(); // Initialize real-time streaming
         this.initializeUXFeatures(); // Initialize UX enhancements
+        this.initializePerformanceOptimization(); // Initialize performance optimization
+        this.initializePerformanceDashboard(); // Initialize performance dashboard
+        this.initializeOfflineDetection(); // Initialize offline detection
         console.log('Speech Translator initialized successfully');
     }
 
@@ -2878,6 +2921,44 @@ class SpeechTranslator {
                 }
             });
         }
+
+        // Performance dashboard controls
+        if (this.elements.performanceToggleBtn) {
+            this.elements.performanceToggleBtn.addEventListener('click', () => {
+                this.togglePerformanceDashboard();
+            });
+        }
+
+        if (this.elements.closePerformanceBtn) {
+            this.elements.closePerformanceBtn.addEventListener('click', () => {
+                this.hidePerformanceDashboard();
+            });
+        }
+
+        if (this.elements.clearCacheBtn) {
+            this.elements.clearCacheBtn.addEventListener('click', () => {
+                this.showConfirmDialog('Clear translation cache?', () => {
+                    this.clearCache();
+                    this.updatePerformanceDashboard();
+                });
+            });
+        }
+
+        if (this.elements.refreshStatsBtn) {
+            this.elements.refreshStatsBtn.addEventListener('click', () => {
+                this.updatePerformanceDashboard();
+                this.showSuccessAnimation(this.elements.refreshStatsBtn);
+            });
+        }
+
+        // Click outside to close performance dashboard
+        if (this.elements.performancePanel) {
+            this.elements.performancePanel.addEventListener('click', (e) => {
+                if (e.target === this.elements.performancePanel) {
+                    this.hidePerformanceDashboard();
+                }
+            });
+        }
     }
 
     // Translation History Management
@@ -3450,6 +3531,431 @@ class SpeechTranslator {
         } else {
             this.updateStatus('No text to retry translation');
         }
+    }
+
+    // ============================================
+    // PERFORMANCE OPTIMIZATION METHODS - Phase 6
+    // ============================================
+
+    // Initialize performance optimization features
+    initializePerformanceOptimization() {
+        this.loadTranslationCache();
+        this.startPerformanceMonitoring();
+        console.log('⚡ Performance optimization features initialized');
+    }
+
+    // Translation caching system
+    getCacheKey(text, sourceLang, targetLang) {
+        return `${sourceLang}-${targetLang}:${text.toLowerCase().trim()}`;
+    }
+
+    addToCache(text, sourceLang, targetLang, translatedText) {
+        const key = this.getCacheKey(text, sourceLang, targetLang);
+        
+        // If cache is full, remove oldest entries (LRU-style)
+        if (this.translationCache.size >= this.maxCacheSize) {
+            const firstKey = this.translationCache.keys().next().value;
+            this.translationCache.delete(firstKey);
+        }
+
+        this.translationCache.set(key, {
+            translatedText,
+            timestamp: Date.now(),
+            accessCount: 1
+        });
+
+        this.saveTranslationCache();
+    }
+
+    getFromCache(text, sourceLang, targetLang) {
+        const key = this.getCacheKey(text, sourceLang, targetLang);
+        const cached = this.translationCache.get(key);
+        
+        if (cached) {
+            // Update access count and move to end (LRU)
+            cached.accessCount++;
+            cached.lastAccessed = Date.now();
+            this.translationCache.delete(key);
+            this.translationCache.set(key, cached);
+            
+            this.performanceMetrics.cacheHits++;
+            return cached.translatedText;
+        }
+
+        this.performanceMetrics.cacheMisses++;
+        return null;
+    }
+
+    loadTranslationCache() {
+        try {
+            const savedCache = localStorage.getItem('translation-cache');
+            if (savedCache) {
+                const cacheData = JSON.parse(savedCache);
+                this.translationCache = new Map(cacheData);
+                console.log(`💾 Loaded ${this.translationCache.size} cached translations`);
+            }
+        } catch (error) {
+            console.error('Failed to load translation cache:', error);
+            this.translationCache = new Map();
+        }
+    }
+
+    saveTranslationCache() {
+        try {
+            const cacheArray = Array.from(this.translationCache.entries());
+            localStorage.setItem('translation-cache', JSON.stringify(cacheArray));
+        } catch (error) {
+            console.error('Failed to save translation cache:', error);
+        }
+    }
+
+    clearCache() {
+        this.translationCache.clear();
+        localStorage.removeItem('translation-cache');
+        this.performanceMetrics.cacheHits = 0;
+        this.performanceMetrics.cacheMisses = 0;
+        console.log('🗑️ Translation cache cleared');
+    }
+
+    // API call optimization with queue and rate limiting
+    async translateTextOptimized(text, sourceLanguage = null, targetLanguage = null) {
+        if (!text || text.trim() === '') {
+            console.warn('No text provided for translation');
+            return null;
+        }
+
+        const sourceLang = sourceLanguage || this.getSpeechToTranslationLanguage(this.elements.sourceLang.value);
+        const targetLang = targetLanguage || this.elements.targetLang.value;
+
+        // Check cache first
+        const cachedResult = this.getFromCache(text, sourceLang, targetLang);
+        if (cachedResult) {
+            console.log('⚡ Cache hit for translation');
+            this.displayTranslationResult(cachedResult);
+            this.addToHistory(text, cachedResult, sourceLang, targetLang);
+            this.updateStatus(`Translation complete: ${sourceLang} → ${targetLang} (cached)`);
+            return { translatedText: cachedResult, sourceLanguage: sourceLang, targetLanguage: targetLang };
+        }
+
+        // Check if this translation is already pending
+        const pendingKey = this.getCacheKey(text, sourceLang, targetLang);
+        if (this.pendingTranslations.has(pendingKey)) {
+            console.log('⏳ Translation already pending');
+            return null;
+        }
+
+        // Add to queue for rate-limited processing
+        return new Promise((resolve, reject) => {
+            this.apiCallQueue.push({
+                text,
+                sourceLang,
+                targetLang,
+                resolve,
+                reject,
+                timestamp: Date.now()
+            });
+
+            this.processApiQueue();
+        });
+    }
+
+    async processApiQueue() {
+        if (this.isProcessingQueue || this.apiCallQueue.length === 0) {
+            return;
+        }
+
+        this.isProcessingQueue = true;
+
+        while (this.apiCallQueue.length > 0) {
+            const timeSinceLastCall = Date.now() - this.lastApiCall;
+            if (timeSinceLastCall < this.minApiInterval) {
+                await this.sleep(this.minApiInterval - timeSinceLastCall);
+            }
+
+            const request = this.apiCallQueue.shift();
+            await this.processTranslationRequest(request);
+        }
+
+        this.isProcessingQueue = false;
+    }
+
+    async processTranslationRequest(request) {
+        const { text, sourceLang, targetLang, resolve, reject } = request;
+        const pendingKey = this.getCacheKey(text, sourceLang, targetLang);
+
+        try {
+            this.pendingTranslations.add(pendingKey);
+            const startTime = Date.now();
+
+            // Show loading state
+            this.showTranslationLoading();
+
+            const response = await fetch('/translate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: text,
+                    source: sourceLang === 'auto' ? undefined : sourceLang,
+                    target: targetLang
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Translation failed');
+            }
+
+            const result = await response.json();
+            const latency = Date.now() - startTime;
+
+            // Update performance metrics
+            this.updatePerformanceMetrics(latency);
+
+            // Cache the result
+            this.addToCache(text, sourceLang, targetLang, result.translatedText);
+
+            // Display and store result
+            this.displayTranslationResult(result.translatedText);
+            this.addToHistory(text, result.translatedText, result.sourceLanguage, result.targetLanguage);
+
+            this.updateStatus(`Translation complete: ${sourceLang} → ${targetLang} (${latency}ms)`);
+            this.lastApiCall = Date.now();
+
+            resolve(result);
+
+        } catch (error) {
+            console.error('❌ Translation error:', error);
+            this.showTranslationError(error.message);
+            this.updateStatus(`Translation failed: ${error.message}`);
+            reject(error);
+        } finally {
+            this.pendingTranslations.delete(pendingKey);
+        }
+    }
+
+    // Debounced translation for real-time input
+    translateTextDebounced(text, sourceLanguage = null, targetLanguage = null) {
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+        }
+
+        this.debounceTimer = setTimeout(() => {
+            this.translateTextOptimized(text, sourceLanguage, targetLanguage);
+        }, this.debounceDelay);
+    }
+
+    // Performance monitoring
+    startPerformanceMonitoring() {
+        // Log performance stats every 60 seconds
+        setInterval(() => {
+            this.logPerformanceStats();
+        }, 60000);
+
+        // Monitor memory usage
+        if (performance.memory) {
+            setInterval(() => {
+                this.monitorMemoryUsage();
+            }, 30000);
+        }
+    }
+
+    updatePerformanceMetrics(latency) {
+        this.performanceMetrics.apiCalls++;
+        this.performanceMetrics.totalTranslations++;
+        this.performanceMetrics.totalLatency += latency;
+        this.performanceMetrics.averageLatency = Math.round(
+            this.performanceMetrics.totalLatency / this.performanceMetrics.apiCalls
+        );
+    }
+
+    logPerformanceStats() {
+        const stats = this.getPerformanceStats();
+        console.log('📊 Performance Stats:', stats);
+    }
+
+    getPerformanceStats() {
+        const runtime = Date.now() - this.performanceMetrics.startTime;
+        const cacheHitRate = this.performanceMetrics.cacheHits + this.performanceMetrics.cacheMisses > 0 
+            ? Math.round((this.performanceMetrics.cacheHits / (this.performanceMetrics.cacheHits + this.performanceMetrics.cacheMisses)) * 100)
+            : 0;
+
+        return {
+            runtime: Math.round(runtime / 1000) + 's',
+            totalTranslations: this.performanceMetrics.totalTranslations,
+            apiCalls: this.performanceMetrics.apiCalls,
+            cacheHits: this.performanceMetrics.cacheHits,
+            cacheMisses: this.performanceMetrics.cacheMisses,
+            cacheHitRate: cacheHitRate + '%',
+            averageLatency: this.performanceMetrics.averageLatency + 'ms',
+            cacheSize: this.translationCache.size,
+            queueSize: this.apiCallQueue.length,
+            pendingTranslations: this.pendingTranslations.size
+        };
+    }
+
+    monitorMemoryUsage() {
+        if (performance.memory) {
+            const memory = performance.memory;
+            const memoryStats = {
+                used: Math.round(memory.usedJSHeapSize / 1024 / 1024) + 'MB',
+                total: Math.round(memory.totalJSHeapSize / 1024 / 1024) + 'MB',
+                limit: Math.round(memory.jsHeapSizeLimit / 1024 / 1024) + 'MB'
+            };
+
+            // Warn if memory usage is high
+            const usagePercent = (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100;
+            if (usagePercent > 80) {
+                console.warn('⚠️ High memory usage:', memoryStats);
+                this.optimizeMemoryUsage();
+            }
+        }
+    }
+
+    optimizeMemoryUsage() {
+        // Clear old cache entries
+        const now = Date.now();
+        const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+
+        for (const [key, value] of this.translationCache.entries()) {
+            if (now - value.timestamp > maxAge) {
+                this.translationCache.delete(key);
+            }
+        }
+
+        // Limit history size
+        if (this.translationHistory.length > this.maxHistoryItems) {
+            this.translationHistory = this.translationHistory.slice(0, this.maxHistoryItems);
+            this.saveTranslationHistory();
+        }
+
+        console.log('🧹 Memory optimization completed');
+    }
+
+    // Offline detection and fallback
+    initializeOfflineDetection() {
+        window.addEventListener('online', () => {
+            this.updateStatus('Connection restored');
+            this.processApiQueue(); // Process any queued requests
+        });
+
+        window.addEventListener('offline', () => {
+            this.updateStatus('No internet connection - working offline');
+        });
+    }
+
+    isOnline() {
+        return navigator.onLine;
+    }
+
+    // Utility methods
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // Override the existing translateText method to use optimized version
+    async translateText(text, sourceLanguage = null, targetLanguage = null) {
+        return this.translateTextOptimized(text, sourceLanguage, targetLanguage);
+    }
+
+    // ============================================
+    // PERFORMANCE DASHBOARD METHODS - Phase 6.1
+    // ============================================
+
+    // Performance Dashboard UI Management
+    togglePerformanceDashboard() {
+        if (this.isPerformanceDashboardVisible) {
+            this.hidePerformanceDashboard();
+        } else {
+            this.showPerformanceDashboard();
+        }
+    }
+
+    showPerformanceDashboard() {
+        this.isPerformanceDashboardVisible = true;
+        if (this.elements.performancePanel) {
+            this.elements.performancePanel.classList.remove('hidden');
+            this.updatePerformanceDashboard();
+        }
+    }
+
+    hidePerformanceDashboard() {
+        this.isPerformanceDashboardVisible = false;
+        if (this.elements.performancePanel) {
+            this.elements.performancePanel.classList.add('hidden');
+        }
+    }
+
+    updatePerformanceDashboard() {
+        const stats = this.getPerformanceStats();
+        
+        if (this.elements.totalTranslations) {
+            this.elements.totalTranslations.textContent = stats.totalTranslations;
+        }
+        
+        if (this.elements.cacheHitRate) {
+            this.elements.cacheHitRate.textContent = stats.cacheHitRate;
+        }
+        
+        if (this.elements.averageLatency) {
+            this.elements.averageLatency.textContent = stats.averageLatency;
+        }
+        
+        if (this.elements.apiCalls) {
+            this.elements.apiCalls.textContent = stats.apiCalls;
+        }
+        
+        if (this.elements.cacheSize) {
+            this.elements.cacheSize.textContent = stats.cacheSize;
+        }
+        
+        if (this.elements.queueSize) {
+            this.elements.queueSize.textContent = stats.queueSize;
+        }
+
+        // Update performance indicator
+        this.updatePerformanceIndicator();
+    }
+
+    updatePerformanceIndicator() {
+        if (!this.elements.performanceIndicator) return;
+
+        const cacheHitRate = this.performanceMetrics.cacheHits + this.performanceMetrics.cacheMisses > 0 
+            ? (this.performanceMetrics.cacheHits / (this.performanceMetrics.cacheHits + this.performanceMetrics.cacheMisses)) * 100
+            : 0;
+
+        let indicator = '⚡';
+        let color = '#4ecdc4';
+
+        if (cacheHitRate >= 80) {
+            indicator = '🚀';
+            color = '#2ecc71';
+        } else if (cacheHitRate >= 60) {
+            indicator = '⚡';
+            color = '#4ecdc4';
+        } else if (cacheHitRate >= 40) {
+            indicator = '⚠️';
+            color = '#f39c12';
+        } else {
+            indicator = '🐌';
+            color = '#e74c3c';
+        }
+
+        this.elements.performanceIndicator.textContent = indicator;
+        this.elements.performanceIndicator.style.color = color;
+    }
+
+    // Initialize performance tracking for dashboard
+    initializePerformanceDashboard() {
+        this.isPerformanceDashboardVisible = false;
+        
+        // Auto-refresh dashboard every 5 seconds if visible
+        setInterval(() => {
+            if (this.isPerformanceDashboardVisible) {
+                this.updatePerformanceDashboard();
+            }
+        }, 5000);
     }
 }
 

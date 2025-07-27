@@ -25,6 +25,60 @@
             </div>
         </header>
 
+        <!-- Performance Dashboard -->
+        <section class="performance-section">
+            <div class="performance-dashboard" id="performance-dashboard">
+                <button class="performance-toggle-btn" id="performance-toggle-btn" title="Toggle performance dashboard (Ctrl+P)">
+                    <i class="fas fa-chart-line"></i>
+                    <span class="performance-indicator" id="performance-indicator">⚡</span>
+                </button>
+                <div class="performance-panel hidden" id="performance-panel">
+                    <div class="performance-header">
+                        <h3><i class="fas fa-tachometer-alt"></i> Performance Dashboard</h3>
+                        <button class="close-performance-btn" id="close-performance-btn" title="Close dashboard">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="performance-content">
+                        <div class="performance-grid">
+                            <div class="metric-card">
+                                <div class="metric-label">Total Translations</div>
+                                <div class="metric-value" id="total-translations">0</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">Cache Hit Rate</div>
+                                <div class="metric-value" id="cache-hit-rate">0%</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">Average Latency</div>
+                                <div class="metric-value" id="average-latency">0ms</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">API Calls</div>
+                                <div class="metric-value" id="api-calls">0</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">Cache Size</div>
+                                <div class="metric-value" id="cache-size">0</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">Queue Size</div>
+                                <div class="metric-value" id="queue-size">0</div>
+                            </div>
+                        </div>
+                        <div class="performance-actions">
+                            <button class="action-btn clear-cache-btn" id="clear-cache-btn" title="Clear translation cache">
+                                <i class="fas fa-trash"></i> Clear Cache
+                            </button>
+                            <button class="action-btn refresh-stats-btn" id="refresh-stats-btn" title="Refresh statistics">
+                                <i class="fas fa-sync"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Language Selection -->
         <section class="language-section">
             <div class="language-selector">
