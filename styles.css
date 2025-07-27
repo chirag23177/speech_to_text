@@ -193,6 +193,74 @@ body {
     box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
 }
 
+/* Popular Language Shortcuts */
+.popular-languages {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    border: 1px solid var(--border-color);
+    animation: fadeInUp 0.8s ease 0.4s both;
+}
+
+.shortcuts-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.8rem;
+}
+
+.shortcuts-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-right: 1rem;
+}
+
+.language-shortcuts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.lang-shortcut {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.5rem 0.8rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    transition: all var(--transition-fast);
+    backdrop-filter: blur(10px);
+    min-width: 60px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+}
+
+.lang-shortcut:hover {
+    background: linear-gradient(135deg, var(--accent-color), #ffed4e);
+    color: #333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+    border-color: var(--accent-color);
+}
+
+.lang-shortcut:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(255, 215, 0, 0.2);
+}
+
+.lang-shortcut.active {
+    background: var(--accent-color);
+    color: #333;
+    border-color: #ffed4e;
+    box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.3);
+}
+
 /* Main Content */
 .main-content {
     flex: 1;
@@ -1228,6 +1296,35 @@ kbd {
 
     .language-selector {
         padding: 1rem 0.5rem;
+    }
+
+    .popular-languages {
+        margin-top: 1rem;
+        padding: 0.8rem;
+    }
+
+    .language-shortcuts {
+        gap: 0.3rem;
+        justify-content: center;
+    }
+
+    .lang-shortcut {
+        font-size: 0.75rem;
+        padding: 0.4rem 0.6rem;
+        min-width: 50px;
+    }
+
+    .shortcuts-label {
+        font-size: 0.8rem;
+        margin-bottom: 0.5rem;
+        text-align: center;
+        width: 100%;
+    }
+
+    .shortcuts-header {
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 0.5rem;
     }
 
     .mic-button {

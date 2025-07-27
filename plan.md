@@ -120,17 +120,20 @@ Build a web-based real-time speech translator that captures spoken input in one 
   - [x] Add loading states and visual feedback for translation process
   - [x] Implement retry functionality for failed translations
 
-#### Part 4.2: Language Selection & Management
+#### Part 4.2: Language Selection & Management ✅
 - **Description**: Implement language selection interface and logic
 - **Input**: Available language options
 - **Output**: Dynamic language switching capability
-- **Technologies**: JavaScript, Translation API language codes
+- **Technologies**: JavaScript, Translation API language codes, localStorage
 - **Task Checklist**:
-  - [ ] Create source language dropdown
-  - [ ] Create target language dropdown
-  - [ ] Implement language swap functionality
-  - [ ] Add popular language shortcuts
-  - [ ] Store user language preferences (localStorage)
+  - [x] Create expanded source language dropdown with 25+ languages
+  - [x] Create expanded target language dropdown with 70+ languages
+  - [x] Implement enhanced language swap functionality with visual feedback
+  - [x] Add popular language shortcuts with flag icons and quick selection
+  - [x] Store user language preferences in localStorage with auto-restore
+  - [x] Enhanced language mapping system supporting more language variants
+  - [x] Visual indicators for active language pairs
+  - [x] Keyboard shortcuts integration (Ctrl+S for swap)
 
 ---
 

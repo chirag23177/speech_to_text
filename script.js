@@ -86,16 +86,20 @@ class SpeechTranslator {
         this.elements.sourceLang.addEventListener('change', (e) => {
             this.currentLanguages.source = e.target.value;
             this.updateStatus(`Source language changed to ${e.target.selectedOptions[0].text}`);
+            this.saveLanguagePreferences();
+            this.updateActiveShortcut();
         });
 
         this.elements.targetLang.addEventListener('change', (e) => {
             this.currentLanguages.target = e.target.value;
             this.updateStatus(`Target language changed to ${e.target.selectedOptions[0].text}`);
+            this.saveLanguagePreferences();
+            this.updateActiveShortcut();
         });
 
         // Language swap
         this.elements.swapButton.addEventListener('click', () => {
-            this.swapLanguages();
+            this.swapLanguagesEnhanced();
         });
 
         // Copy buttons
@@ -127,6 +131,9 @@ class SpeechTranslator {
             this.showSettings();
         });
 
+        // Popular language shortcuts
+        this.initializeLanguageShortcuts();
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.code === 'Space' && e.ctrlKey) {
@@ -135,7 +142,7 @@ class SpeechTranslator {
             }
             if (e.code === 'KeyS' && e.ctrlKey) {
                 e.preventDefault();
-                this.swapLanguages();
+                this.swapLanguagesEnhanced();
             }
             if (e.code === 'KeyT' && e.ctrlKey) {
                 e.preventDefault();
@@ -180,6 +187,9 @@ class SpeechTranslator {
 
         // Load saved theme preference
         this.loadThemePreference();
+        
+        // Load saved language preferences
+        this.loadLanguagePreferences();
     }
 
     // Initialize the application
@@ -2180,27 +2190,44 @@ class SpeechTranslator {
         alert(`Error: ${message}`);
     }
 
-    // Swap source and target languages
+    // Swap source and target languages (legacy method - calls enhanced version)
     swapLanguages() {
-        const sourceLang = this.elements.sourceLang.value;
-        const targetLang = this.elements.targetLang.value;
-        
-        // Language mapping between speech recognition codes and translation codes
-        const langMapping = {
+        this.swapLanguagesEnhanced();
+    }
+
+    // Enhanced language mapping with expanded options
+    getLanguageMapping() {
+        return {
             'en-US': 'en',
+            'en-GB': 'en',
             'es-ES': 'es',
+            'es-MX': 'es',
             'fr-FR': 'fr',
             'de-DE': 'de',
             'it-IT': 'it',
             'pt-PT': 'pt',
+            'pt-BR': 'pt',
             'hi-IN': 'hi',
             'zh-CN': 'zh',
             'ja-JP': 'ja',
             'ko-KR': 'ko',
-            'ar-SA': 'ar'
+            'ar-SA': 'ar',
+            'ru-RU': 'ru',
+            'nl-NL': 'nl',
+            'sv-SE': 'sv',
+            'da-DK': 'da',
+            'no-NO': 'no',
+            'fi-FI': 'fi',
+            'tr-TR': 'tr',
+            'pl-PL': 'pl',
+            'cs-CZ': 'cs',
+            'hu-HU': 'hu',
+            'ro-RO': 'ro'
         };
+    }
 
-        const reverseLangMapping = {
+    getReverseLanguageMapping() {
+        return {
             'en': 'en-US',
             'es': 'es-ES',
             'fr': 'fr-FR',
@@ -2211,8 +2238,188 @@ class SpeechTranslator {
             'zh': 'zh-CN',
             'ja': 'ja-JP',
             'ko': 'ko-KR',
-            'ar': 'ar-SA'
+            'ar': 'ar-SA',
+            'ru': 'ru-RU',
+            'nl': 'nl-NL',
+            'sv': 'sv-SE',
+            'da': 'da-DK',
+            'no': 'no-NO',
+            'fi': 'fi-FI',
+            'tr': 'tr-TR',
+            'pl': 'pl-PL',
+            'cs': 'cs-CZ',
+            'hu': 'hu-HU',
+            'ro': 'ro-RO'
         };
+    }
+
+    // Initialize popular language shortcuts
+    initializeLanguageShortcuts() {
+        const shortcuts = document.querySelectorAll('.lang-shortcut');
+        shortcuts.forEach(shortcut => {
+            shortcut.addEventListener('click', () => {
+                const source = shortcut.getAttribute('data-source');
+                const target = shortcut.getAttribute('data-target');
+                this.setLanguagePair(source, target);
+                this.highlightActiveShortcut(shortcut);
+            });
+        });
+        
+        // Highlight current active shortcut
+        this.updateActiveShortcut();
+    }
+
+    // Set language pair from shortcuts
+    setLanguagePair(sourceCode, targetCode) {
+        this.elements.sourceLang.value = sourceCode;
+        this.elements.targetLang.value = targetCode;
+        
+        // Update current languages
+        this.currentLanguages.source = sourceCode;
+        this.currentLanguages.target = targetCode;
+        
+        // Trigger change events
+        this.elements.sourceLang.dispatchEvent(new Event('change'));
+        this.elements.targetLang.dispatchEvent(new Event('change'));
+        
+        // Save preferences
+        this.saveLanguagePreferences();
+        
+        this.updateStatus(`Language pair set: ${this.getLanguageName(sourceCode)} → ${this.getLanguageName(targetCode)}`);
+    }
+
+    // Highlight active language shortcut
+    highlightActiveShortcut(activeShortcut) {
+        // Remove active class from all shortcuts
+        document.querySelectorAll('.lang-shortcut').forEach(shortcut => {
+            shortcut.classList.remove('active');
+        });
+        
+        // Add active class to selected shortcut
+        if (activeShortcut) {
+            activeShortcut.classList.add('active');
+        }
+    }
+
+    // Update active shortcut based on current language selection
+    updateActiveShortcut() {
+        const currentSource = this.elements.sourceLang.value;
+        const currentTarget = this.elements.targetLang.value;
+        
+        const shortcuts = document.querySelectorAll('.lang-shortcut');
+        shortcuts.forEach(shortcut => {
+            const source = shortcut.getAttribute('data-source');
+            const target = shortcut.getAttribute('data-target');
+            
+            if (source === currentSource && target === currentTarget) {
+                this.highlightActiveShortcut(shortcut);
+            }
+        });
+    }
+
+    // Get language display name
+    getLanguageName(langCode) {
+        const langNames = {
+            'en-US': 'English (US)',
+            'en-GB': 'English (UK)',
+            'es-ES': 'Spanish (Spain)',
+            'es-MX': 'Spanish (Mexico)',
+            'fr-FR': 'French',
+            'de-DE': 'German',
+            'it-IT': 'Italian',
+            'pt-PT': 'Portuguese (Portugal)',
+            'pt-BR': 'Portuguese (Brazil)',
+            'hi-IN': 'Hindi',
+            'zh-CN': 'Chinese (Mandarin)',
+            'ja-JP': 'Japanese',
+            'ko-KR': 'Korean',
+            'ar-SA': 'Arabic',
+            'ru-RU': 'Russian',
+            'nl-NL': 'Dutch',
+            'sv-SE': 'Swedish',
+            'da-DK': 'Danish',
+            'no-NO': 'Norwegian',
+            'fi-FI': 'Finnish',
+            'tr-TR': 'Turkish',
+            'pl-PL': 'Polish',
+            'cs-CZ': 'Czech',
+            'hu-HU': 'Hungarian',
+            'ro-RO': 'Romanian',
+            'en': 'English',
+            'es': 'Spanish',
+            'fr': 'French',
+            'de': 'German',
+            'it': 'Italian',
+            'pt': 'Portuguese',
+            'hi': 'Hindi',
+            'zh': 'Chinese',
+            'ja': 'Japanese',
+            'ko': 'Korean',
+            'ar': 'Arabic',
+            'ru': 'Russian',
+            'nl': 'Dutch',
+            'sv': 'Swedish',
+            'da': 'Danish',
+            'no': 'Norwegian',
+            'fi': 'Finnish',
+            'tr': 'Turkish',
+            'pl': 'Polish',
+            'cs': 'Czech',
+            'hu': 'Hungarian',
+            'ro': 'Romanian'
+        };
+        
+        return langNames[langCode] || langCode;
+    }
+
+    // Save language preferences to localStorage
+    saveLanguagePreferences() {
+        const preferences = {
+            source: this.currentLanguages.source,
+            target: this.currentLanguages.target,
+            timestamp: new Date().toISOString()
+        };
+        
+        localStorage.setItem('language-preferences', JSON.stringify(preferences));
+        console.log('Language preferences saved:', preferences);
+    }
+
+    // Load language preferences from localStorage
+    loadLanguagePreferences() {
+        try {
+            const savedPreferences = localStorage.getItem('language-preferences');
+            if (savedPreferences) {
+                const preferences = JSON.parse(savedPreferences);
+                
+                // Set the dropdown values
+                if (preferences.source && this.elements.sourceLang) {
+                    this.elements.sourceLang.value = preferences.source;
+                    this.currentLanguages.source = preferences.source;
+                }
+                
+                if (preferences.target && this.elements.targetLang) {
+                    this.elements.targetLang.value = preferences.target;
+                    this.currentLanguages.target = preferences.target;
+                }
+                
+                console.log('Language preferences loaded:', preferences);
+                this.updateStatus('Language preferences restored');
+                
+                // Update active shortcut after loading
+                setTimeout(() => this.updateActiveShortcut(), 100);
+            }
+        } catch (error) {
+            console.error('Failed to load language preferences:', error);
+        }
+    }
+
+    // Enhanced swapLanguages using new mapping system
+    swapLanguagesEnhanced() {
+        const sourceLang = this.elements.sourceLang.value;
+        const targetLang = this.elements.targetLang.value;
+        
+        const langMapping = this.getLanguageMapping();
+        const reverseLangMapping = this.getReverseLanguageMapping();
 
         // Swap the values
         this.elements.sourceLang.value = reverseLangMapping[targetLang] || 'en-US';
@@ -2222,7 +2429,11 @@ class SpeechTranslator {
         this.currentLanguages.source = this.elements.sourceLang.value;
         this.currentLanguages.target = this.elements.targetLang.value;
 
-        this.updateStatus('Languages swapped');
+        // Save preferences and update UI
+        this.saveLanguagePreferences();
+        this.updateActiveShortcut();
+        
+        this.updateStatus(`Languages swapped: ${this.getLanguageName(this.currentLanguages.source)} ↔ ${this.getLanguageName(this.currentLanguages.target)}`);
     }
 
     // Copy text to clipboard
@@ -2459,19 +2670,7 @@ class SpeechTranslator {
 
     // Convert speech recognition language code to translation language code
     getSpeechToTranslationLanguage(speechLangCode) {
-        const mapping = {
-            'en-US': 'en',
-            'es-ES': 'es',
-            'fr-FR': 'fr',
-            'de-DE': 'de',
-            'it-IT': 'it',
-            'pt-PT': 'pt',
-            'hi-IN': 'hi',
-            'zh-CN': 'zh',
-            'ja-JP': 'ja',
-            'ko-KR': 'ko',
-            'ar-SA': 'ar'
-        };
+        const mapping = this.getLanguageMapping();
         return mapping[speechLangCode] || 'en';
     }
 
