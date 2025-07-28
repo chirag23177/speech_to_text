@@ -79,6 +79,209 @@
             </div>
         </section>
 
+        <!-- Bonus Features Panel -->
+        <section class="bonus-features-section">
+            <div class="bonus-features-toggle">
+                <button class="bonus-toggle-btn" id="bonus-toggle-btn" title="Toggle bonus features (Ctrl+B)">
+                    <i class="fas fa-magic"></i>
+                    <span>Bonus Features</span>
+                </button>
+            </div>
+            
+            <div class="bonus-features-panel hidden" id="bonus-features-panel">
+                <div class="bonus-features-grid">
+                    <!-- Conversation Mode -->
+                    <div class="bonus-feature-card">
+                        <div class="feature-header">
+                            <i class="fas fa-comments"></i>
+                            <h4>Conversation Mode</h4>
+                        </div>
+                        <p>Enable back-and-forth conversation translation</p>
+                        <div class="feature-controls">
+                            <button class="feature-btn" id="conversation-mode-btn" title="Toggle conversation mode">
+                                <i class="fas fa-play"></i> Start Conversation
+                            </button>
+                            <div class="conversation-participants hidden" id="conversation-participants">
+                                <div class="participant">
+                                    <label>Person A speaks:</label>
+                                    <select id="participant-a-lang" class="mini-dropdown"></select>
+                                </div>
+                                <div class="participant">
+                                    <label>Person B speaks:</label>
+                                    <select id="participant-b-lang" class="mini-dropdown"></select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Text-to-Speech -->
+                    <div class="bonus-feature-card">
+                        <div class="feature-header">
+                            <i class="fas fa-volume-up"></i>
+                            <h4>Text-to-Speech</h4>
+                        </div>
+                        <p>Hear translations spoken aloud</p>
+                        <div class="feature-controls">
+                            <div class="tts-controls">
+                                <label>Voice Speed:</label>
+                                <input type="range" id="tts-rate" min="0.5" max="2" step="0.1" value="1">
+                                <span id="tts-rate-value">1.0x</span>
+                            </div>
+                            <div class="tts-controls">
+                                <label>Voice Pitch:</label>
+                                <input type="range" id="tts-pitch" min="0.5" max="2" step="0.1" value="1">
+                                <span id="tts-pitch-value">1.0</span>
+                            </div>
+                            <button class="feature-btn" id="test-tts-btn" title="Test text-to-speech">
+                                <i class="fas fa-play"></i> Test Voice
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Export & Share -->
+                    <div class="bonus-feature-card">
+                        <div class="feature-header">
+                            <i class="fas fa-share-alt"></i>
+                            <h4>Export & Share</h4>
+                        </div>
+                        <p>Export conversations and create shareable links</p>
+                        <div class="feature-controls">
+                            <button class="feature-btn" id="export-conversation-btn" title="Export current conversation">
+                                <i class="fas fa-file-export"></i> Export Conversation
+                            </button>
+                            <button class="feature-btn" id="create-share-link-btn" title="Create shareable link">
+                                <i class="fas fa-link"></i> Create Share Link
+                            </button>
+                            <button class="feature-btn" id="download-audio-btn" title="Download audio recording">
+                                <i class="fas fa-microphone"></i> Download Audio
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Pronunciation Guide -->
+                    <div class="bonus-feature-card">
+                        <div class="feature-header">
+                            <i class="fas fa-language"></i>
+                            <h4>Pronunciation Guide</h4>
+                        </div>
+                        <p>Get pronunciation help for translated text</p>
+                        <div class="feature-controls">
+                            <button class="feature-btn" id="show-pronunciation-btn" title="Show pronunciation guide">
+                                <i class="fas fa-eye"></i> Show Pronunciation
+                            </button>
+                            <div class="pronunciation-display hidden" id="pronunciation-display">
+                                <div class="pronunciation-text" id="pronunciation-text"></div>
+                                <button class="play-pronunciation-btn" id="play-pronunciation-btn">
+                                    <i class="fas fa-play"></i> Play
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Custom Vocabulary -->
+                    <div class="bonus-feature-card">
+                        <div class="feature-header">
+                            <i class="fas fa-book"></i>
+                            <h4>Custom Vocabulary</h4>
+                        </div>
+                        <p>Save frequently used phrases and translations</p>
+                        <div class="feature-controls">
+                            <button class="feature-btn" id="manage-vocabulary-btn" title="Manage custom vocabulary">
+                                <i class="fas fa-cog"></i> Manage Phrases
+                            </button>
+                            <div class="quick-phrases" id="quick-phrases">
+                                <label>Quick Phrases:</label>
+                                <select id="quick-phrases-select" class="mini-dropdown">
+                                    <option value="">Select a phrase...</option>
+                                </select>
+                                <button class="insert-phrase-btn" id="insert-phrase-btn" title="Insert selected phrase">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Settings -->
+                    <div class="bonus-feature-card">
+                        <div class="feature-header">
+                            <i class="fas fa-cogs"></i>
+                            <h4>Advanced Settings</h4>
+                        </div>
+                        <p>Fine-tune translation and speech settings</p>
+                        <div class="feature-controls">
+                            <div class="setting-row">
+                                <label>Auto-speak translations:</label>
+                                <input type="checkbox" id="auto-speak-checkbox">
+                            </div>
+                            <div class="setting-row">
+                                <label>Auto-save conversations:</label>
+                                <input type="checkbox" id="auto-save-checkbox">
+                            </div>
+                            <div class="setting-row">
+                                <label>Translation confidence threshold:</label>
+                                <input type="range" id="confidence-threshold" min="0" max="1" step="0.1" value="0.7">
+                                <span id="confidence-value">70%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Custom Vocabulary Modal -->
+        <div class="modal hidden" id="vocabulary-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-book"></i> Custom Vocabulary Manager</h3>
+                    <button class="close-modal-btn" id="close-vocabulary-modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="add-phrase-section">
+                        <h4>Add New Phrase</h4>
+                        <div class="phrase-inputs">
+                            <input type="text" id="new-phrase-original" placeholder="Original text..." maxlength="200">
+                            <input type="text" id="new-phrase-translation" placeholder="Translation..." maxlength="200">
+                            <select id="new-phrase-category" class="mini-dropdown">
+                                <option value="general">General</option>
+                                <option value="business">Business</option>
+                                <option value="travel">Travel</option>
+                                <option value="medical">Medical</option>
+                                <option value="education">Education</option>
+                                <option value="food">Food & Dining</option>
+                                <option value="shopping">Shopping</option>
+                                <option value="emergency">Emergency</option>
+                            </select>
+                            <button class="add-phrase-btn" id="add-phrase-btn">
+                                <i class="fas fa-plus"></i> Add Phrase
+                            </button>
+                        </div>
+                    </div>
+                    <div class="phrases-list-section">
+                        <h4>Saved Phrases</h4>
+                        <div class="phrases-filter">
+                            <select id="phrases-filter-category" class="mini-dropdown">
+                                <option value="">All Categories</option>
+                                <option value="general">General</option>
+                                <option value="business">Business</option>
+                                <option value="travel">Travel</option>
+                                <option value="medical">Medical</option>
+                                <option value="education">Education</option>
+                                <option value="food">Food & Dining</option>
+                                <option value="shopping">Shopping</option>
+                                <option value="emergency">Emergency</option>
+                            </select>
+                            <input type="text" id="phrases-search" placeholder="Search phrases...">
+                        </div>
+                        <div class="phrases-list" id="phrases-list">
+                            <!-- Phrases will be dynamically inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Language Selection -->
         <section class="language-section">
             <div class="language-selector">
@@ -280,9 +483,6 @@
                             <button class="copy-btn" id="copy-input" title="Copy text (Ctrl+C)" aria-label="Copy Input Text">
                                 <i class="fas fa-copy"></i>
                             </button>
-                            <button class="action-btn" id="clear-input" title="Clear input text (Ctrl+Shift+I)" aria-label="Clear Input">
-                                <i class="fas fa-eraser"></i>
-                            </button>
                         </div>
                     </div>
                     <div class="text-display" id="speech-input">
@@ -305,14 +505,8 @@
                     <div class="area-header">
                         <h3><i class="fas fa-globe"></i> Translation</h3>
                         <div class="header-actions">
-                            <button class="speak-btn" id="speak-output" title="Read translation aloud (Ctrl+R)" aria-label="Speak Translation">
-                                <i class="fas fa-volume-up"></i>
-                            </button>
                             <button class="copy-btn" id="copy-output" title="Copy translation (Ctrl+Shift+C)" aria-label="Copy Translation">
                                 <i class="fas fa-copy"></i>
-                            </button>
-                            <button class="action-btn" id="save-translation" title="Save to history (Ctrl+S)" aria-label="Save Translation">
-                                <i class="fas fa-bookmark"></i>
                             </button>
                         </div>
                     </div>

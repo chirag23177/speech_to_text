@@ -52,6 +52,7 @@ class SpeechTranslator {
         this.tooltipTimeout = null;
         this.isHistoryVisible = false;
         this.isPerformanceDashboardVisible = false;
+        this.isBonusFeaturesVisible = false;
         
         // Performance Optimization Properties - Phase 6.1
         this.translationCache = new Map();
@@ -72,6 +73,21 @@ class SpeechTranslator {
         this.pendingTranslations = new Set();
         this.debounceTimer = null;
         this.debounceDelay = 1000; // 1 second debounce for real-time translation
+
+        // Bonus Features Properties - Phase 6.2
+        this.bonusFeatures = {
+            conversationMode: false,
+            autoSpeak: false,
+            autoSave: false,
+            confidenceThreshold: 0.7,
+            ttsRate: 1.0,
+            ttsPitch: 1.0
+        };
+        this.conversationHistory = [];
+        this.currentSpeaker = 'A'; // A or B
+        this.customVocabulary = [];
+        this.audioRecordings = [];
+        this.pronunciationCache = new Map();
         
         this.initializeElements();
         this.setupEventListeners();
@@ -91,7 +107,6 @@ class SpeechTranslator {
             translationOutput: document.getElementById('translation-output'),
             copyInputBtn: document.getElementById('copy-input'),
             copyOutputBtn: document.getElementById('copy-output'),
-            speakOutputBtn: document.getElementById('speak-output'),
             loadingOverlay: document.getElementById('loading-overlay'),
             themeToggle: document.getElementById('theme-toggle'),
             clearAllBtn: document.getElementById('clear-all'),
@@ -106,10 +121,6 @@ class SpeechTranslator {
             closeHistoryBtn: document.getElementById('close-history'),
             clearHistoryBtn: document.getElementById('clear-history'),
             exportHistoryBtn: document.getElementById('export-history'),
-            clearInputBtn: document.getElementById('clear-input'),
-            saveTranslationBtn: document.getElementById('save-translation'),
-            historyCount: document.getElementById('history-count'),
-            historySize: document.getElementById('history-size'),
             tooltip: document.getElementById('tooltip'),
             // Performance dashboard elements
             performanceToggleBtn: document.getElementById('performance-toggle-btn'),
@@ -123,7 +134,42 @@ class SpeechTranslator {
             apiCalls: document.getElementById('api-calls'),
             cacheSize: document.getElementById('cache-size'),
             queueSize: document.getElementById('queue-size'),
-            performanceIndicator: document.getElementById('performance-indicator')
+            performanceIndicator: document.getElementById('performance-indicator'),
+            // Bonus features elements
+            bonusToggleBtn: document.getElementById('bonus-toggle-btn'),
+            bonusFeaturesPanel: document.getElementById('bonus-features-panel'),
+            conversationModeBtn: document.getElementById('conversation-mode-btn'),
+            conversationParticipants: document.getElementById('conversation-participants'),
+            participantALang: document.getElementById('participant-a-lang'),
+            participantBLang: document.getElementById('participant-b-lang'),
+            ttsRate: document.getElementById('tts-rate'),
+            ttsRateValue: document.getElementById('tts-rate-value'),
+            ttsPitch: document.getElementById('tts-pitch'),
+            ttsPitchValue: document.getElementById('tts-pitch-value'),
+            testTtsBtn: document.getElementById('test-tts-btn'),
+            exportConversationBtn: document.getElementById('export-conversation-btn'),
+            createShareLinkBtn: document.getElementById('create-share-link-btn'),
+            downloadAudioBtn: document.getElementById('download-audio-btn'),
+            showPronunciationBtn: document.getElementById('show-pronunciation-btn'),
+            pronunciationDisplay: document.getElementById('pronunciation-display'),
+            pronunciationText: document.getElementById('pronunciation-text'),
+            playPronunciationBtn: document.getElementById('play-pronunciation-btn'),
+            manageVocabularyBtn: document.getElementById('manage-vocabulary-btn'),
+            quickPhrasesSelect: document.getElementById('quick-phrases-select'),
+            insertPhraseBtn: document.getElementById('insert-phrase-btn'),
+            autoSpeakCheckbox: document.getElementById('auto-speak-checkbox'),
+            autoSaveCheckbox: document.getElementById('auto-save-checkbox'),
+            confidenceThreshold: document.getElementById('confidence-threshold'),
+            confidenceValue: document.getElementById('confidence-value'),
+            vocabularyModal: document.getElementById('vocabulary-modal'),
+            closeVocabularyModal: document.getElementById('close-vocabulary-modal'),
+            newPhraseOriginal: document.getElementById('new-phrase-original'),
+            newPhraseTranslation: document.getElementById('new-phrase-translation'),
+            newPhraseCategory: document.getElementById('new-phrase-category'),
+            addPhraseBtn: document.getElementById('add-phrase-btn'),
+            phrasesFilterCategory: document.getElementById('phrases-filter-category'),
+            phrasesSearch: document.getElementById('phrases-search'),
+            phrasesList: document.getElementById('phrases-list')
         };
     }
 
@@ -161,11 +207,6 @@ class SpeechTranslator {
 
         this.elements.copyOutputBtn.addEventListener('click', () => {
             this.copyToClipboard('output');
-        });
-
-        // Speak output button
-        this.elements.speakOutputBtn.addEventListener('click', () => {
-            this.speakText('output');
         });
 
         // Theme toggle
@@ -226,6 +267,12 @@ class SpeechTranslator {
                 this.togglePerformanceDashboard();
             }
             
+            // Bonus features
+            if (e.code === 'KeyB' && e.ctrlKey) {
+                e.preventDefault();
+                this.toggleBonusFeatures();
+            }
+            
             // Copy controls
             if (e.code === 'KeyC' && e.ctrlKey && e.shiftKey) {
                 e.preventDefault();
@@ -241,12 +288,6 @@ class SpeechTranslator {
             if (e.code === 'KeyI' && e.ctrlKey && e.shiftKey) {
                 e.preventDefault();
                 this.clearInput();
-            }
-            
-            // Read aloud
-            if (e.code === 'KeyR' && e.ctrlKey) {
-                e.preventDefault();
-                this.speakText('output');
             }
             
             // Settings
@@ -312,6 +353,7 @@ class SpeechTranslator {
         this.initializeUXFeatures(); // Initialize UX enhancements
         this.initializePerformanceOptimization(); // Initialize performance optimization
         this.initializePerformanceDashboard(); // Initialize performance dashboard
+        this.initializeBonusFeatures(); // Initialize bonus features
         this.initializeOfflineDetection(); // Initialize offline detection
         console.log('Speech Translator initialized successfully');
     }
@@ -847,9 +889,9 @@ class SpeechTranslator {
             
             // Update UI state
             this.isRecording = false;
-            this.updateUI('processing');
-            this.updateStatus('Processing speech...');
-            this.updateStatusDot('processing');
+            this.updateUI('idle'); // Changed from 'processing' to 'idle' since we do real-time translation
+            this.updateStatus('Ready to translate'); // Changed status message
+            this.updateStatusDot('idle'); // Changed to idle status
             this.hideRecordingFeedback();
             
             // Remove pulsing animation
@@ -1494,6 +1536,11 @@ class SpeechTranslator {
                 // Update status with confidence
                 const confidencePercent = Math.round((confidence || 0) * 100);
                 this.updateStatus(`Live transcription (${confidencePercent}% confidence)`);
+                
+                // Update confidence indicator
+                if (confidence !== undefined) {
+                    this.updateConfidenceIndicator(confidence);
+                }
             }
         } else {
             // Interim result - update interim transcript
@@ -2642,18 +2689,12 @@ class SpeechTranslator {
             utterance.rate = 0.9;
             utterance.pitch = 1;
             
-            // Visual feedback
-            const button = this.elements.speakOutputBtn;
-            const originalIcon = button.innerHTML;
-            button.innerHTML = '<i class="fas fa-stop"></i>';
-            
+            // Visual feedback (button removed, just use status)
             utterance.onend = () => {
-                button.innerHTML = originalIcon;
                 this.updateStatus('Finished speaking');
             };
             
             utterance.onerror = () => {
-                button.innerHTML = originalIcon;
                 this.updateStatus('Speech synthesis failed');
             };
             
@@ -2900,19 +2941,6 @@ class SpeechTranslator {
             });
         }
 
-        // Individual action buttons
-        if (this.elements.clearInputBtn) {
-            this.elements.clearInputBtn.addEventListener('click', () => {
-                this.clearInput();
-            });
-        }
-
-        if (this.elements.saveTranslationBtn) {
-            this.elements.saveTranslationBtn.addEventListener('click', () => {
-                this.saveCurrentTranslation();
-            });
-        }
-
         // Click outside to close history
         if (this.elements.historyPanel) {
             this.elements.historyPanel.addEventListener('click', (e) => {
@@ -3080,7 +3108,7 @@ class SpeechTranslator {
         );
 
         this.updateStatus('Translation saved to history');
-        this.showSuccessAnimation(this.elements.saveTranslationBtn);
+        // Note: saveTranslationBtn removed, no animation needed
     }
 
     // History UI Management
@@ -3239,7 +3267,7 @@ class SpeechTranslator {
         this.interimTranscript = '';
         this.showSpeechPlaceholder();
         this.updateStatus('Input text cleared');
-        this.showSuccessAnimation(this.elements.clearInputBtn);
+        // Note: clearInputBtn removed, no animation needed
     }
 
     // Enhanced copy-to-clipboard with visual feedback
@@ -3854,9 +3882,9 @@ class SpeechTranslator {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    // Override the existing translateText method to use optimized version
+    // Override the existing translateText method to use optimized version with bonus features
     async translateText(text, sourceLanguage = null, targetLanguage = null) {
-        return this.translateTextOptimized(text, sourceLanguage, targetLanguage);
+        return this.translateTextWithBonusFeatures(text, sourceLanguage, targetLanguage);
     }
 
     // ============================================
@@ -3956,6 +3984,758 @@ class SpeechTranslator {
                 this.updatePerformanceDashboard();
             }
         }, 5000);
+    }
+
+    // ============================================
+    // BONUS FEATURES METHODS - Phase 6.2
+    // ============================================
+
+    // Initialize bonus features
+    initializeBonusFeatures() {
+        this.loadBonusSettings();
+        this.loadCustomVocabulary();
+        this.populateLanguageDropdowns();
+        this.setupBonusEventListeners();
+        this.initializeTTSControls();
+        console.log('🎁 Bonus features initialized');
+    }
+
+    // Load bonus features settings
+    loadBonusSettings() {
+        try {
+            const saved = localStorage.getItem('bonus-settings');
+            if (saved) {
+                this.bonusFeatures = { ...this.bonusFeatures, ...JSON.parse(saved) };
+                this.applyBonusSettings();
+            }
+        } catch (error) {
+            console.error('Failed to load bonus settings:', error);
+        }
+    }
+
+    saveBonusSettings() {
+        try {
+            localStorage.setItem('bonus-settings', JSON.stringify(this.bonusFeatures));
+        } catch (error) {
+            console.error('Failed to save bonus settings:', error);
+        }
+    }
+
+    applyBonusSettings() {
+        if (this.elements.autoSpeakCheckbox) {
+            this.elements.autoSpeakCheckbox.checked = this.bonusFeatures.autoSpeak;
+        }
+        if (this.elements.autoSaveCheckbox) {
+            this.elements.autoSaveCheckbox.checked = this.bonusFeatures.autoSave;
+        }
+        if (this.elements.confidenceThreshold) {
+            this.elements.confidenceThreshold.value = this.bonusFeatures.confidenceThreshold;
+            this.updateConfidenceDisplay();
+        }
+        if (this.elements.ttsRate) {
+            this.elements.ttsRate.value = this.bonusFeatures.ttsRate;
+            this.updateTTSRateDisplay();
+        }
+        if (this.elements.ttsPitch) {
+            this.elements.ttsPitch.value = this.bonusFeatures.ttsPitch;
+            this.updateTTSPitchDisplay();
+        }
+    }
+
+    // Bonus Features UI Management
+    toggleBonusFeatures() {
+        if (this.isBonusFeaturesVisible) {
+            this.hideBonusFeatures();
+        } else {
+            this.showBonusFeatures();
+        }
+    }
+
+    showBonusFeatures() {
+        this.isBonusFeaturesVisible = true;
+        if (this.elements.bonusFeaturesPanel) {
+            this.elements.bonusFeaturesPanel.classList.remove('hidden');
+            this.updateQuickPhrases();
+        }
+    }
+
+    hideBonusFeatures() {
+        this.isBonusFeaturesVisible = false;
+        if (this.elements.bonusFeaturesPanel) {
+            this.elements.bonusFeaturesPanel.classList.add('hidden');
+        }
+    }
+
+    // Setup bonus features event listeners
+    setupBonusEventListeners() {
+        // Bonus panel toggle
+        if (this.elements.bonusToggleBtn) {
+            this.elements.bonusToggleBtn.addEventListener('click', () => {
+                this.toggleBonusFeatures();
+            });
+        }
+
+        // Conversation mode
+        if (this.elements.conversationModeBtn) {
+            this.elements.conversationModeBtn.addEventListener('click', () => {
+                this.toggleConversationMode();
+            });
+        }
+
+        // TTS controls
+        if (this.elements.ttsRate) {
+            this.elements.ttsRate.addEventListener('input', () => {
+                this.bonusFeatures.ttsRate = parseFloat(this.elements.ttsRate.value);
+                this.updateTTSRateDisplay();
+                this.saveBonusSettings();
+            });
+        }
+
+        if (this.elements.ttsPitch) {
+            this.elements.ttsPitch.addEventListener('input', () => {
+                this.bonusFeatures.ttsPitch = parseFloat(this.elements.ttsPitch.value);
+                this.updateTTSPitchDisplay();
+                this.saveBonusSettings();
+            });
+        }
+
+        if (this.elements.testTtsBtn) {
+            this.elements.testTtsBtn.addEventListener('click', () => {
+                this.testTTS();
+            });
+        }
+
+        // Export and share
+        if (this.elements.exportConversationBtn) {
+            this.elements.exportConversationBtn.addEventListener('click', () => {
+                this.exportConversation();
+            });
+        }
+
+        if (this.elements.createShareLinkBtn) {
+            this.elements.createShareLinkBtn.addEventListener('click', () => {
+                this.createShareLink();
+            });
+        }
+
+        if (this.elements.downloadAudioBtn) {
+            this.elements.downloadAudioBtn.addEventListener('click', () => {
+                this.downloadAudioRecording();
+            });
+        }
+
+        // Pronunciation
+        if (this.elements.showPronunciationBtn) {
+            this.elements.showPronunciationBtn.addEventListener('click', () => {
+                this.showPronunciationGuide();
+            });
+        }
+
+        if (this.elements.playPronunciationBtn) {
+            this.elements.playPronunciationBtn.addEventListener('click', () => {
+                this.playPronunciation();
+            });
+        }
+
+        // Vocabulary management
+        if (this.elements.manageVocabularyBtn) {
+            this.elements.manageVocabularyBtn.addEventListener('click', () => {
+                this.showVocabularyManager();
+            });
+        }
+
+        if (this.elements.insertPhraseBtn) {
+            this.elements.insertPhraseBtn.addEventListener('click', () => {
+                this.insertSelectedPhrase();
+            });
+        }
+
+        // Settings
+        if (this.elements.autoSpeakCheckbox) {
+            this.elements.autoSpeakCheckbox.addEventListener('change', (e) => {
+                this.bonusFeatures.autoSpeak = e.target.checked;
+                this.saveBonusSettings();
+            });
+        }
+
+        if (this.elements.autoSaveCheckbox) {
+            this.elements.autoSaveCheckbox.addEventListener('change', (e) => {
+                this.bonusFeatures.autoSave = e.target.checked;
+                this.saveBonusSettings();
+            });
+        }
+
+        if (this.elements.confidenceThreshold) {
+            this.elements.confidenceThreshold.addEventListener('input', () => {
+                this.bonusFeatures.confidenceThreshold = parseFloat(this.elements.confidenceThreshold.value);
+                this.updateConfidenceDisplay();
+                this.saveBonusSettings();
+            });
+        }
+
+        // Vocabulary modal
+        if (this.elements.closeVocabularyModal) {
+            this.elements.closeVocabularyModal.addEventListener('click', () => {
+                this.hideVocabularyManager();
+            });
+        }
+
+        if (this.elements.addPhraseBtn) {
+            this.elements.addPhraseBtn.addEventListener('click', () => {
+                this.addCustomPhrase();
+            });
+        }
+
+        if (this.elements.phrasesFilterCategory) {
+            this.elements.phrasesFilterCategory.addEventListener('change', () => {
+                this.filterPhrases();
+            });
+        }
+
+        if (this.elements.phrasesSearch) {
+            this.elements.phrasesSearch.addEventListener('input', () => {
+                this.filterPhrases();
+            });
+        }
+    }
+
+    // 1. CONVERSATION MODE
+    toggleConversationMode() {
+        this.bonusFeatures.conversationMode = !this.bonusFeatures.conversationMode;
+        
+        if (this.bonusFeatures.conversationMode) {
+            this.startConversationMode();
+        } else {
+            this.stopConversationMode();
+        }
+    }
+
+    startConversationMode() {
+        this.conversationHistory = [];
+        this.currentSpeaker = 'A';
+        
+        if (this.elements.conversationModeBtn) {
+            this.elements.conversationModeBtn.innerHTML = '<i class="fas fa-stop"></i> Stop Conversation';
+            this.elements.conversationModeBtn.classList.add('active');
+        }
+        
+        if (this.elements.conversationParticipants) {
+            this.elements.conversationParticipants.classList.remove('hidden');
+        }
+        
+        this.updateStatus('Conversation mode started - Person A can speak first');
+        this.showSuccessAnimation(this.elements.conversationModeBtn);
+    }
+
+    stopConversationMode() {
+        if (this.elements.conversationModeBtn) {
+            this.elements.conversationModeBtn.innerHTML = '<i class="fas fa-play"></i> Start Conversation';
+            this.elements.conversationModeBtn.classList.remove('active');
+        }
+        
+        if (this.elements.conversationParticipants) {
+            this.elements.conversationParticipants.classList.add('hidden');
+        }
+        
+        this.updateStatus('Conversation mode stopped');
+        
+        if (this.bonusFeatures.autoSave && this.conversationHistory.length > 0) {
+            this.autoSaveConversation();
+        }
+    }
+
+    switchSpeaker() {
+        this.currentSpeaker = this.currentSpeaker === 'A' ? 'B' : 'A';
+        const speakerName = this.currentSpeaker === 'A' ? 'Person A' : 'Person B';
+        this.updateStatus(`${speakerName}'s turn to speak`);
+    }
+
+    addToConversation(originalText, translatedText, speaker) {
+        const conversationEntry = {
+            timestamp: new Date().toISOString(),
+            speaker: speaker,
+            originalText: originalText,
+            translatedText: translatedText,
+            sourceLang: speaker === 'A' ? this.elements.participantALang?.value : this.elements.participantBLang?.value,
+            targetLang: speaker === 'A' ? this.elements.participantBLang?.value : this.elements.participantALang?.value
+        };
+        
+        this.conversationHistory.push(conversationEntry);
+        
+        if (this.bonusFeatures.autoSpeak) {
+            this.speakTranslation(translatedText, conversationEntry.targetLang);
+        }
+    }
+
+    // 2. TEXT-TO-SPEECH ENHANCEMENT
+    initializeTTSControls() {
+        this.updateTTSRateDisplay();
+        this.updateTTSPitchDisplay();
+    }
+
+    updateTTSRateDisplay() {
+        if (this.elements.ttsRateValue) {
+            this.elements.ttsRateValue.textContent = `${this.bonusFeatures.ttsRate}x`;
+        }
+    }
+
+    updateTTSPitchDisplay() {
+        if (this.elements.ttsPitchValue) {
+            this.elements.ttsPitchValue.textContent = this.bonusFeatures.ttsPitch.toFixed(1);
+        }
+    }
+
+    testTTS() {
+        const testText = "Hello! This is a test of the text-to-speech system.";
+        this.speakTranslation(testText, 'en');
+        this.showSuccessAnimation(this.elements.testTtsBtn);
+    }
+
+    speakTranslation(text, languageCode) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = this.getSpeechSynthesisLanguage(languageCode);
+            utterance.rate = this.bonusFeatures.ttsRate;
+            utterance.pitch = this.bonusFeatures.ttsPitch;
+            utterance.volume = 1;
+            
+            utterance.onstart = () => {
+                this.updateStatus(`Speaking: ${text.substring(0, 30)}${text.length > 30 ? '...' : ''}`);
+            };
+            
+            utterance.onend = () => {
+                this.updateStatus('Speech completed');
+            };
+            
+            utterance.onerror = (error) => {
+                console.error('Speech synthesis error:', error);
+                this.updateStatus('Speech synthesis failed');
+            };
+            
+            window.speechSynthesis.speak(utterance);
+        } else {
+            this.updateStatus('Text-to-speech not supported in this browser');
+        }
+    }
+
+    // 3. EXPORT AND SHARE FUNCTIONALITY
+    exportConversation() {
+        if (this.conversationHistory.length === 0) {
+            this.updateStatus('No conversation to export');
+            return;
+        }
+        
+        const exportData = {
+            type: 'conversation',
+            exportDate: new Date().toISOString(),
+            participants: {
+                A: this.elements.participantALang?.value || 'Unknown',
+                B: this.elements.participantBLang?.value || 'Unknown'
+            },
+            totalEntries: this.conversationHistory.length,
+            conversation: this.conversationHistory
+        };
+        
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+            type: 'application/json'
+        });
+        
+        this.downloadFile(blob, `conversation-${new Date().toISOString().split('T')[0]}.json`);
+        this.showSuccessAnimation(this.elements.exportConversationBtn);
+    }
+
+    createShareLink() {
+        if (this.conversationHistory.length === 0 && this.translationHistory.length === 0) {
+            this.updateStatus('No content to share');
+            return;
+        }
+        
+        const shareData = {
+            translations: this.translationHistory.slice(0, 5), // Last 5 translations
+            conversation: this.conversationHistory.slice(-10), // Last 10 conversation entries
+            timestamp: Date.now()
+        };
+        
+        const compressed = btoa(JSON.stringify(shareData));
+        const shareUrl = `${window.location.origin}${window.location.pathname}?share=${compressed}`;
+        
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            this.updateStatus('Share link copied to clipboard');
+            this.showSuccessAnimation(this.elements.createShareLinkBtn);
+        }).catch(() => {
+            this.updateStatus('Failed to copy share link');
+        });
+    }
+
+    downloadAudioRecording() {
+        if (this.audioRecordings.length === 0) {
+            this.updateStatus('No audio recordings available');
+            return;
+        }
+        
+        // Get the latest recording
+        const latestRecording = this.audioRecordings[this.audioRecordings.length - 1];
+        this.downloadFile(latestRecording.blob, `recording-${Date.now()}.wav`);
+        this.showSuccessAnimation(this.elements.downloadAudioBtn);
+    }
+
+    downloadFile(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    autoSaveConversation() {
+        const filename = `auto-conversation-${Date.now()}.json`;
+        const exportData = {
+            type: 'auto-saved-conversation',
+            timestamp: new Date().toISOString(),
+            conversation: this.conversationHistory
+        };
+        
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+            type: 'application/json'
+        });
+        
+        this.downloadFile(blob, filename);
+        this.updateStatus('Conversation auto-saved');
+    }
+
+    // 4. PRONUNCIATION GUIDE
+    showPronunciationGuide() {
+        const translatedElement = this.elements.translationOutput.querySelector('.translated-text, .text-content');
+        
+        if (!translatedElement || !translatedElement.textContent.trim()) {
+            this.updateStatus('No translation available for pronunciation guide');
+            return;
+        }
+        
+        const text = translatedElement.textContent.trim();
+        const targetLang = this.currentLanguages.target;
+        
+        this.generatePronunciation(text, targetLang);
+    }
+
+    generatePronunciation(text, languageCode) {
+        // Simple pronunciation guide generator
+        const pronunciation = this.createPronunciationGuide(text, languageCode);
+        
+        if (this.elements.pronunciationText) {
+            this.elements.pronunciationText.textContent = pronunciation;
+        }
+        
+        if (this.elements.pronunciationDisplay) {
+            this.elements.pronunciationDisplay.classList.remove('hidden');
+        }
+        
+        this.showSuccessAnimation(this.elements.showPronunciationBtn);
+    }
+
+    createPronunciationGuide(text, languageCode) {
+        // Cache check
+        const cacheKey = `${languageCode}:${text}`;
+        if (this.pronunciationCache.has(cacheKey)) {
+            return this.pronunciationCache.get(cacheKey);
+        }
+        
+        // Simple pronunciation mapping for common languages
+        const pronunciationMaps = {
+            'es': { 'ñ': 'nnya', 'rr': 'rrah', 'll': 'yah', 'j': 'h' },
+            'fr': { 'ch': 'sh', 'j': 'zh', 'r': 'rrr', 'u': 'uu' },
+            'de': { 'ch': 'kh', 'sch': 'sh', 'ü': 'ue', 'ö': 'oe', 'ä': 'ae' },
+            'zh': text => `[${text}] (Mandarin pronunciation)`,
+            'ja': text => `[${text}] (Japanese pronunciation)`,
+            'ar': text => `[${text}] (Arabic pronunciation)`
+        };
+        
+        let pronunciation = text.toLowerCase();
+        
+        if (pronunciationMaps[languageCode]) {
+            if (typeof pronunciationMaps[languageCode] === 'function') {
+                pronunciation = pronunciationMaps[languageCode](text);
+            } else {
+                Object.entries(pronunciationMaps[languageCode]).forEach(([key, value]) => {
+                    pronunciation = pronunciation.replace(new RegExp(key, 'g'), value);
+                });
+            }
+        }
+        
+        // Add phonetic hints
+        pronunciation = `/${pronunciation}/`;
+        
+        // Cache the result
+        this.pronunciationCache.set(cacheKey, pronunciation);
+        
+        return pronunciation;
+    }
+
+    playPronunciation() {
+        const pronunciationText = this.elements.pronunciationText?.textContent;
+        if (pronunciationText) {
+            // Extract the original text (remove pronunciation markers)
+            const originalText = pronunciationText.replace(/[\/\[\]()]/g, '').trim();
+            this.speakTranslation(originalText, this.currentLanguages.target);
+            this.showSuccessAnimation(this.elements.playPronunciationBtn);
+        }
+    }
+
+    // 5. CUSTOM VOCABULARY MANAGEMENT
+    loadCustomVocabulary() {
+        try {
+            const saved = localStorage.getItem('custom-vocabulary');
+            if (saved) {
+                this.customVocabulary = JSON.parse(saved);
+                console.log(`📚 Loaded ${this.customVocabulary.length} custom phrases`);
+            }
+        } catch (error) {
+            console.error('Failed to load custom vocabulary:', error);
+            this.customVocabulary = [];
+        }
+    }
+
+    saveCustomVocabulary() {
+        try {
+            localStorage.setItem('custom-vocabulary', JSON.stringify(this.customVocabulary));
+        } catch (error) {
+            console.error('Failed to save custom vocabulary:', error);
+        }
+    }
+
+    showVocabularyManager() {
+        if (this.elements.vocabularyModal) {
+            this.elements.vocabularyModal.classList.remove('hidden');
+            this.renderPhrasesList();
+        }
+    }
+
+    hideVocabularyManager() {
+        if (this.elements.vocabularyModal) {
+            this.elements.vocabularyModal.classList.add('hidden');
+        }
+    }
+
+    addCustomPhrase() {
+        const original = this.elements.newPhraseOriginal?.value.trim();
+        const translation = this.elements.newPhraseTranslation?.value.trim();
+        const category = this.elements.newPhraseCategory?.value || 'general';
+        
+        if (!original || !translation) {
+            this.updateStatus('Please enter both original text and translation');
+            return;
+        }
+        
+        const newPhrase = {
+            id: Date.now(),
+            original: original,
+            translation: translation,
+            category: category,
+            sourceLang: this.currentLanguages.source,
+            targetLang: this.currentLanguages.target,
+            dateAdded: new Date().toISOString(),
+            useCount: 0
+        };
+        
+        this.customVocabulary.unshift(newPhrase);
+        this.saveCustomVocabulary();
+        this.renderPhrasesList();
+        this.updateQuickPhrases();
+        
+        // Clear inputs
+        if (this.elements.newPhraseOriginal) this.elements.newPhraseOriginal.value = '';
+        if (this.elements.newPhraseTranslation) this.elements.newPhraseTranslation.value = '';
+        
+        this.updateStatus('Custom phrase added');
+        this.showSuccessAnimation(this.elements.addPhraseBtn);
+    }
+
+    renderPhrasesList() {
+        if (!this.elements.phrasesList) return;
+        
+        const filteredPhrases = this.getFilteredPhrases();
+        
+        if (filteredPhrases.length === 0) {
+            this.elements.phrasesList.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: #6c757d;">
+                    <i class="fas fa-inbox" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                    <p>No phrases found</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const phrasesHTML = filteredPhrases.map(phrase => this.createPhraseItemHTML(phrase)).join('');
+        this.elements.phrasesList.innerHTML = phrasesHTML;
+        
+        this.setupPhraseItemListeners();
+    }
+
+    createPhraseItemHTML(phrase) {
+        return `
+            <div class="phrase-item" data-id="${phrase.id}">
+                <div class="phrase-content">
+                    <div class="phrase-original">${this.escapeHtml(phrase.original)}</div>
+                    <div class="phrase-translation">${this.escapeHtml(phrase.translation)}</div>
+                    <span class="phrase-category">${phrase.category}</span>
+                </div>
+                <div class="phrase-actions">
+                    <button class="use-btn" title="Use this phrase">Use</button>
+                    <button class="edit-btn" title="Edit phrase">Edit</button>
+                    <button class="delete-btn" title="Delete phrase">Delete</button>
+                </div>
+            </div>
+        `;
+    }
+
+    setupPhraseItemListeners() {
+        // Use phrase buttons
+        document.querySelectorAll('.phrase-item .use-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const phraseId = parseInt(e.target.closest('.phrase-item').dataset.id);
+                this.useCustomPhrase(phraseId);
+            });
+        });
+        
+        // Delete phrase buttons
+        document.querySelectorAll('.phrase-item .delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const phraseId = parseInt(e.target.closest('.phrase-item').dataset.id);
+                this.deleteCustomPhrase(phraseId);
+            });
+        });
+    }
+
+    useCustomPhrase(phraseId) {
+        const phrase = this.customVocabulary.find(p => p.id === phraseId);
+        if (phrase) {
+            // Insert the phrase into the speech input
+            this.insertTextIntoSpeechInput(phrase.original);
+            
+            // Trigger translation
+            this.translateText(phrase.original);
+            
+            // Update use count
+            phrase.useCount++;
+            this.saveCustomVocabulary();
+            
+            // Close modal
+            this.hideVocabularyManager();
+            
+            this.updateStatus('Phrase inserted and translated');
+        }
+    }
+
+    deleteCustomPhrase(phraseId) {
+        if (confirm('Are you sure you want to delete this phrase?')) {
+            this.customVocabulary = this.customVocabulary.filter(p => p.id !== phraseId);
+            this.saveCustomVocabulary();
+            this.renderPhrasesList();
+            this.updateQuickPhrases();
+            this.updateStatus('Phrase deleted');
+        }
+    }
+
+    getFilteredPhrases() {
+        let filtered = [...this.customVocabulary];
+        
+        // Filter by category
+        const categoryFilter = this.elements.phrasesFilterCategory?.value;
+        if (categoryFilter) {
+            filtered = filtered.filter(phrase => phrase.category === categoryFilter);
+        }
+        
+        // Filter by search term
+        const searchTerm = this.elements.phrasesSearch?.value.toLowerCase();
+        if (searchTerm) {
+            filtered = filtered.filter(phrase => 
+                phrase.original.toLowerCase().includes(searchTerm) ||
+                phrase.translation.toLowerCase().includes(searchTerm)
+            );
+        }
+        
+        return filtered;
+    }
+
+    filterPhrases() {
+        this.renderPhrasesList();
+    }
+
+    updateQuickPhrases() {
+        if (!this.elements.quickPhrasesSelect) return;
+        
+        // Clear existing options
+        this.elements.quickPhrasesSelect.innerHTML = '<option value="">Select a phrase...</option>';
+        
+        // Add top 10 most used phrases
+        const topPhrases = this.customVocabulary
+            .sort((a, b) => b.useCount - a.useCount)
+            .slice(0, 10);
+        
+        topPhrases.forEach(phrase => {
+            const option = document.createElement('option');
+            option.value = phrase.id;
+            option.textContent = `${phrase.original} → ${phrase.translation}`;
+            this.elements.quickPhrasesSelect.appendChild(option);
+        });
+    }
+
+    insertSelectedPhrase() {
+        const selectedId = this.elements.quickPhrasesSelect?.value;
+        if (selectedId) {
+            this.useCustomPhrase(parseInt(selectedId));
+        }
+    }
+
+    insertTextIntoSpeechInput(text) {
+        // Clear any existing content and insert new text
+        this.finalTranscript = text;
+        this.displaySpeechResult(text, false);
+    }
+
+    // 6. UTILITY METHODS FOR BONUS FEATURES
+    populateLanguageDropdowns() {
+        // Populate conversation participant language dropdowns
+        const sourceOptions = this.elements.sourceLang?.innerHTML || '';
+        const targetOptions = this.elements.targetLang?.innerHTML || '';
+        
+        if (this.elements.participantALang) {
+            this.elements.participantALang.innerHTML = sourceOptions;
+            this.elements.participantALang.value = this.currentLanguages.source;
+        }
+        
+        if (this.elements.participantBLang) {
+            this.elements.participantBLang.innerHTML = targetOptions;
+            this.elements.participantBLang.value = this.currentLanguages.target;
+        }
+    }
+
+    updateConfidenceDisplay() {
+        if (this.elements.confidenceValue) {
+            const percentage = Math.round(this.bonusFeatures.confidenceThreshold * 100);
+            this.elements.confidenceValue.textContent = `${percentage}%`;
+        }
+    }
+
+    // Override translateText to integrate with bonus features
+    async translateTextWithBonusFeatures(text, sourceLanguage = null, targetLanguage = null) {
+        const result = await this.translateTextOptimized(text, sourceLanguage, targetLanguage);
+        
+        if (result && this.bonusFeatures.conversationMode) {
+            this.addToConversation(text, result.translatedText, this.currentSpeaker);
+            this.switchSpeaker();
+        }
+        
+        if (result && this.bonusFeatures.autoSpeak) {
+            this.speakTranslation(result.translatedText, result.targetLanguage);
+        }
+        
+        return result;
     }
 }
 

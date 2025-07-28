@@ -181,18 +181,18 @@ Build a web-based real-time speech translator that captures spoken input in one 
   - [x] Minify and optimize assets
   - [x] Add performance monitoring
 
-#### Part 6.2: Bonus Features
+#### Part 6.2: Bonus Features ✅ COMPLETE
 - **Description**: Add additional features to enhance the application
 - **Input**: Core application complete
 - **Output**: Feature-rich speech translator
 - **Technologies**: Various APIs and browser features
 - **Task Checklist**:
-  - [ ] Add text-to-speech for translated output
-  - [ ] Implement conversation mode (back-and-forth)
-  - [ ] Add download/export functionality
-  - [ ] Create shareable translation links
-  - [ ] Add pronunciation guides
-  - [ ] Implement custom vocabulary/phrases
+  - [x] Add text-to-speech for translated output
+  - [x] Implement conversation mode (back-and-forth)
+  - [x] Add download/export functionality
+  - [x] Create shareable translation links
+  - [x] Add pronunciation guides
+  - [x] Implement custom vocabulary/phrases
 
 ---
 
