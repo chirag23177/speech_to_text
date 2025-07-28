@@ -52,7 +52,6 @@ class SpeechTranslator {
         this.tooltipTimeout = null;
         this.isHistoryVisible = false;
         this.isPerformanceDashboardVisible = false;
-        this.isBonusFeaturesVisible = false;
         
         // Performance Optimization Properties - Phase 6.1
         this.translationCache = new Map();
@@ -73,21 +72,6 @@ class SpeechTranslator {
         this.pendingTranslations = new Set();
         this.debounceTimer = null;
         this.debounceDelay = 1000; // 1 second debounce for real-time translation
-
-        // Bonus Features Properties - Phase 6.2
-        this.bonusFeatures = {
-            conversationMode: false,
-            autoSpeak: false,
-            autoSave: false,
-            confidenceThreshold: 0.7,
-            ttsRate: 1.0,
-            ttsPitch: 1.0
-        };
-        this.conversationHistory = [];
-        this.currentSpeaker = 'A'; // A or B
-        this.customVocabulary = [];
-        this.audioRecordings = [];
-        this.pronunciationCache = new Map();
         
         this.initializeElements();
         this.setupEventListeners();
@@ -134,42 +118,7 @@ class SpeechTranslator {
             apiCalls: document.getElementById('api-calls'),
             cacheSize: document.getElementById('cache-size'),
             queueSize: document.getElementById('queue-size'),
-            performanceIndicator: document.getElementById('performance-indicator'),
-            // Bonus features elements
-            bonusToggleBtn: document.getElementById('bonus-toggle-btn'),
-            bonusFeaturesPanel: document.getElementById('bonus-features-panel'),
-            conversationModeBtn: document.getElementById('conversation-mode-btn'),
-            conversationParticipants: document.getElementById('conversation-participants'),
-            participantALang: document.getElementById('participant-a-lang'),
-            participantBLang: document.getElementById('participant-b-lang'),
-            ttsRate: document.getElementById('tts-rate'),
-            ttsRateValue: document.getElementById('tts-rate-value'),
-            ttsPitch: document.getElementById('tts-pitch'),
-            ttsPitchValue: document.getElementById('tts-pitch-value'),
-            testTtsBtn: document.getElementById('test-tts-btn'),
-            exportConversationBtn: document.getElementById('export-conversation-btn'),
-            createShareLinkBtn: document.getElementById('create-share-link-btn'),
-            downloadAudioBtn: document.getElementById('download-audio-btn'),
-            showPronunciationBtn: document.getElementById('show-pronunciation-btn'),
-            pronunciationDisplay: document.getElementById('pronunciation-display'),
-            pronunciationText: document.getElementById('pronunciation-text'),
-            playPronunciationBtn: document.getElementById('play-pronunciation-btn'),
-            manageVocabularyBtn: document.getElementById('manage-vocabulary-btn'),
-            quickPhrasesSelect: document.getElementById('quick-phrases-select'),
-            insertPhraseBtn: document.getElementById('insert-phrase-btn'),
-            autoSpeakCheckbox: document.getElementById('auto-speak-checkbox'),
-            autoSaveCheckbox: document.getElementById('auto-save-checkbox'),
-            confidenceThreshold: document.getElementById('confidence-threshold'),
-            confidenceValue: document.getElementById('confidence-value'),
-            vocabularyModal: document.getElementById('vocabulary-modal'),
-            closeVocabularyModal: document.getElementById('close-vocabulary-modal'),
-            newPhraseOriginal: document.getElementById('new-phrase-original'),
-            newPhraseTranslation: document.getElementById('new-phrase-translation'),
-            newPhraseCategory: document.getElementById('new-phrase-category'),
-            addPhraseBtn: document.getElementById('add-phrase-btn'),
-            phrasesFilterCategory: document.getElementById('phrases-filter-category'),
-            phrasesSearch: document.getElementById('phrases-search'),
-            phrasesList: document.getElementById('phrases-list')
+            performanceIndicator: document.getElementById('performance-indicator')
         };
     }
 
@@ -267,12 +216,6 @@ class SpeechTranslator {
                 this.togglePerformanceDashboard();
             }
             
-            // Bonus features
-            if (e.code === 'KeyB' && e.ctrlKey) {
-                e.preventDefault();
-                this.toggleBonusFeatures();
-            }
-            
             // Copy controls
             if (e.code === 'KeyC' && e.ctrlKey && e.shiftKey) {
                 e.preventDefault();
@@ -353,7 +296,6 @@ class SpeechTranslator {
         this.initializeUXFeatures(); // Initialize UX enhancements
         this.initializePerformanceOptimization(); // Initialize performance optimization
         this.initializePerformanceDashboard(); // Initialize performance dashboard
-        this.initializeBonusFeatures(); // Initialize bonus features
         this.initializeOfflineDetection(); // Initialize offline detection
         console.log('Speech Translator initialized successfully');
     }
@@ -3882,9 +3824,9 @@ class SpeechTranslator {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    // Override the existing translateText method to use optimized version with bonus features
+    // Override the existing translateText method to use optimized version
     async translateText(text, sourceLanguage = null, targetLanguage = null) {
-        return this.translateTextWithBonusFeatures(text, sourceLanguage, targetLanguage);
+        return this.translateTextOptimized(text, sourceLanguage, targetLanguage);
     }
 
     // ============================================
@@ -3986,9 +3928,6 @@ class SpeechTranslator {
         }, 5000);
     }
 
-    // ============================================
-    // BONUS FEATURES METHODS - Phase 6.2
-    // ============================================
 
     // Initialize bonus features
     initializeBonusFeatures() {
