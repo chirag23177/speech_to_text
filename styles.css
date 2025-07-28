@@ -1447,7 +1447,7 @@ kbd {
     align-items: center;
     justify-content: center;
     z-index: 1001;
-    backdrop-filter: blur(5px);
+    backdrop-filter: blur(25px);
     animation: fadeIn 0.3s ease;
 }
 
@@ -1456,7 +1456,7 @@ kbd {
 }
 
 .history-content {
-    background: var(--bg-secondary); /* Use theme background instead of overlay */
+    background: var(--background-overlay); /* Use theme background instead of overlay */
     border: 1px solid var(--border-color);
     border-radius: 20px;
     width: 90%;
@@ -1865,18 +1865,20 @@ kbd {
 }
 
 .close-performance-btn {
-    background: none;
-    border: none;
-    color: white;
+    background: linear-gradient(135deg, var(--error-color), #ff0000);
+    border: 1px solid var(--error-color);
+    min-width: 40px; /* Ensure close button has proper width */
+    /* border: none; */
+    color: rgb(255, 255, 255);
     font-size: 1.2rem;
     cursor: pointer;
     padding: 0.25rem;
-    border-radius: 50%;
+    border-radius: 5%;
     transition: background-color 0.2s ease;
 }
 
 .close-performance-btn:hover {
-    background-color: rgba(255, 255, 255, 0.2);
+    background-color: rgba(250, 43, 43, 0.2);
 }
 
 .performance-content {
