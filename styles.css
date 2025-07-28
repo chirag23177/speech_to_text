@@ -1797,7 +1797,7 @@ kbd {
 }
 
 .performance-toggle-btn {
-    background: var(--secondary-color); /* Use theme colors */
+    background: var(--background-overlay); /* Use theme colors */
     color: var(--text-primary);
     border: 1px solid var(--border-color);
     padding: 0.75rem 1rem;
@@ -1810,6 +1810,7 @@ kbd {
     font-weight: 500;
     transition: all 0.3s ease;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    margin-bottom: 17px;
 }
 
 .performance-toggle-btn:hover {
