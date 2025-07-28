@@ -13,7 +13,8 @@
     "pack": "electron-builder --dir",
     "dist": "electron-builder --publish=never",
     "web-start": "node server.js",
-    "web-dev": "nodemon server.js"
+    "web-dev": "nodemon server.js",
+    "install-deps": "npm install electron@28.1.0 electron-builder@24.9.1 @google-cloud/speech@6.0.0 @google-cloud/translate@8.5.1"
   },
   "keywords": [
     "speech-to-text",
@@ -33,26 +34,27 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chirag23177/speech_to_text.git"
+    "url": "https://github.com/chirag23177/speech_to_text.git"
   },
   "bugs": {
     "url": "https://github.com/chirag23177/speech_to_text/issues"
   },
   "homepage": "https://github.com/chirag23177/speech_to_text#readme",
   "dependencies": {
-    "@google-cloud/speech": "^6.7.1",
+    "@google-cloud/speech": "^6.0.0",
     "@google-cloud/translate": "^8.5.1",
-    "express": "^4.18.2",
-    "ffmpeg-static": "^5.2.0",
-    "fluent-ffmpeg": "^2.1.2",
-    "node-record-lpcm16": "^1.0.1",
-    "speaker": "^0.5.4",
-    "wav": "^1.0.2"
+    "electron": "^28.1.0"
   },
   "devDependencies": {
-    "electron": "^37.2.4",
     "electron-builder": "^24.9.1",
     "nodemon": "^3.0.1"
+  },
+  "optionalDependencies": {
+    "node-record-lpcm16": "^1.0.1",
+    "speaker": "^0.5.4",
+    "fluent-ffmpeg": "^2.1.2",
+    "ffmpeg-static": "^5.2.0",
+    "wav": "^1.0.2"
   },
   "build": {
     "appId": "com.chirag23177.speech-translator",
@@ -88,6 +90,5 @@
   "engines": {
     "node": ">=16.0.0",
     "npm": ">=8.0.0"
-  },
-  "type": "commonjs"
+  }
 }

@@ -1,10 +1,342 @@
-# 🌍 Real-Time Speech Translator
+# 🖥️ Real-Time Speech Translator Desktop
 
-A powerful web-based application that provides real-time speech-to-text transcription and translation using Google Cloud APIs. Speak in one language and see the translated text instantly in another language.
+A powerful cross-platform desktop application that provides real-time speech-to-text transcription and translation with **system audio capture** capabilities. Perfect for online meetings, webinars, and any audio content on your computer.
 
 ![Project Demo](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
+![Electron](https://img.shields.io/badge/Electron-28%2B-blue.svg)
 ![Node.js](https://img.shields.io/badge/Node.js-16%2B-green.svg)
+
+## 🎯 Key Features
+
+### 🎙️ Advanced Audio Capture
+- **Microphone Input**: Traditional microphone recording
+- **System Audio Loopback**: Capture audio from Zoom, Meet, YouTube, etc.
+- **Multiple Device Support**: Auto-detect and select from available audio devices
+- **Real-time Audio Visualization**: Live audio level display and animated bars
+
+### 🌍 Real-Time Translation
+- **25+ Source Languages**: Support for major world languages via Google Speech-to-Text
+- **70+ Target Languages**: Translate to any language supported by Google Translate
+- **Instant Processing**: Live transcription and translation as you speak
+- **High Accuracy**: Enterprise-grade Google Cloud APIs
+
+### 🖥️ Desktop Experience
+- **Cross-Platform**: Windows, macOS, and Linux support
+- **System Tray Integration**: Minimize to tray with quick access
+- **Global Shortcuts**: Control the app from anywhere
+- **Offline UI**: Works without internet for the interface (APIs require connection)
+
+### 📊 Advanced Features
+- **Translation History**: Save, search, and export translation sessions
+- **Performance Dashboard**: Monitor API usage, cache performance, and latency
+- **Smart Caching**: Reduce API calls with intelligent translation caching
+- **Multiple Themes**: Light and dark themes with automatic saving
+- **Keyboard Shortcuts**: Full keyboard navigation and control
+
+## 🛠️ Technology Stack
+
+### Desktop Framework
+- **Electron 28+**: Cross-platform desktop app framework
+- **Node.js 16+**: JavaScript runtime for backend processing
+- **HTML5/CSS3/JavaScript**: Modern web technologies for UI
+
+### Audio Processing
+- **node-record-lpcm16**: Microphone audio capture
+- **FFmpeg**: System audio capture and processing
+- **Web Audio API**: Real-time audio visualization
+- **PCM/WAV**: High-quality audio format support
+
+### Cloud Services
+- **Google Cloud Speech-to-Text**: Advanced speech recognition
+- **Google Cloud Translation API v2**: Professional translation service
+- **Real-time Streaming**: Continuous audio processing
+
+### Architecture
+- **Main Process**: Electron main process for system integration
+- **Renderer Process**: UI and application logic
+- **Modular Design**: Separate modules for audio, transcription, and translation
+- **IPC Communication**: Secure inter-process communication
+
+## 📁 Project Structure
+
+```
+speech_to_text/
+├── 📄 main.js                # Electron main process
+├── 🎨 renderer.js             # UI logic and coordination
+├── 🎙️ audioCapture.js         # Audio capture (mic + system)
+├── 📝 transcriber.js          # Google Speech-to-Text integration
+├── 🌍 translator.js           # Google Translate integration
+├── 🖼️ index.html              # Desktop UI layout
+├── 🎨 styles.css              # Desktop-optimized styling
+├── 📦 package.json            # Dependencies and build config
+├── 🔐 credentials.json        # Google Cloud service account
+├── 📋 plan.md                 # Development roadmap
+├── 📖 README.md               # This documentation
+├── 🔧 .vscode/
+│   └── tasks.json             # VS Code build tasks
+├── 🖼️ assets/
+│   ├── icon.png               # App icon (512x512)
+│   ├── icon.ico               # Windows icon
+│   └── icon.icns              # macOS icon
+├── 🌐 Legacy Files (for reference):
+│   ├── server.js              # Original web server
+│   └── script.js              # Original web client
+└── 📂 node_modules/           # Dependencies
+```
+
+## 🚀 Quick Start
+
+### Prerequisites
+- **Node.js 16+**: [Download](https://nodejs.org/)
+- **Google Cloud Account**: [Sign up](https://cloud.google.com/)
+- **FFmpeg** (for system audio): [Download](https://ffmpeg.org/download.html)
+
+### 1. Clone and Install
+```bash
+git clone https://github.com/chirag23177/speech_to_text.git
+cd speech_to_text
+npm install
+```
+
+### 2. Google Cloud Setup
+1. Create a [Google Cloud Project](https://console.cloud.google.com/)
+2. Enable APIs:
+   - [Speech-to-Text API](https://console.cloud.google.com/apis/library/speech.googleapis.com)
+   - [Translation API](https://console.cloud.google.com/apis/library/translate.googleapis.com)
+3. Create Service Account with roles:
+   - `Cloud Speech Client`
+   - `Cloud Translation API User`
+4. Download JSON key as `credentials.json` in project root
+
+### 3. System Audio Setup (Optional)
+
+#### Windows
+- Enable "Stereo Mix" in Sound settings, or
+- Install [VB-Cable](https://vb-audio.com/Cable/) for virtual audio routing
+
+#### macOS
+- Install [BlackHole](https://github.com/ExistentialAudio/BlackHole) or
+- Use [SoundFlower](https://github.com/mattingalls/Soundflower)
+
+#### Linux
+- PulseAudio monitor devices are auto-detected
+- Use `pavucontrol` to manage audio routing
+
+### 4. Run the Application
+```bash
+# Development mode (with console)
+npm run dev
+
+# Production mode
+npm start
+```
+
+## 🎮 How to Use
+
+### Basic Operation
+1. **Launch App**: Double-click or run `npm start`
+2. **Select Audio**: Choose microphone or system audio mode
+3. **Pick Languages**: Source (speech) and target (translation)
+4. **Start Recording**: Click record button or press `Ctrl+Space`
+5. **View Results**: See live transcription and translation
+
+### System Audio Capture
+1. **Switch Mode**: Click "Switch to System Audio"
+2. **Select Device**: Choose your system's loopback device
+3. **Start Meeting**: Open Zoom, Meet, YouTube, etc.
+4. **Record**: Capture and translate any audio playing on your system
+
+### Keyboard Shortcuts
+- `Ctrl+Space`: Toggle recording
+- `Ctrl+S`: Swap source/target languages
+- `Ctrl+T`: Toggle light/dark theme
+- `Ctrl+H`: Show/hide translation history
+- `Ctrl+P`: Show/hide performance dashboard
+- `Ctrl+Shift+Space`: Global recording toggle (even when app is minimized)
+- `Ctrl+Shift+T`: Global show/hide app
+- `Escape`: Stop recording
+
+### Menu Features
+- **File Menu**: New session, export history
+- **Audio Menu**: Recording controls, device switching
+- **View Menu**: Themes, panels, developer tools
+- **Help Menu**: About dialog, update checks
+
+## ⚙️ Configuration
+
+### Audio Settings
+```javascript
+// Customize in audioCapture.js
+const audioConfig = {
+  sampleRate: 16000,    // 16kHz for Google Speech
+  channels: 1,          // Mono audio
+  threshold: 500,       // Audio level threshold
+  silenceTimeout: 2000  // 2 seconds silence detection
+};
+```
+
+### Translation Settings
+```javascript
+// Customize in translator.js
+const translationConfig = {
+  cacheMaxSize: 1000,   // Max cached translations
+  rateLimitDelay: 100,  // 100ms between API calls
+  confidence: 0.8       // Minimum confidence threshold
+};
+```
+
+### Environment Variables
+```bash
+# Optional: Custom Google Cloud Project
+GOOGLE_CLOUD_PROJECT_ID=your-project-id
+
+# Optional: Custom port for legacy web mode
+PORT=3001
+```
+
+## 📦 Building & Distribution
+
+### Development Build
+```bash
+npm run dev
+```
+
+### Production Build
+```bash
+# All platforms
+npm run build
+
+# Platform-specific
+npm run build-win    # Windows installer
+npm run build-mac    # macOS DMG
+npm run build-linux  # Linux AppImage
+```
+
+### Distribution Files
+- **Windows**: `.exe` installer and portable app
+- **macOS**: `.dmg` disk image
+- **Linux**: `.AppImage` portable executable
+
+## 🔧 System Requirements
+
+### Minimum Requirements
+- **OS**: Windows 10, macOS 10.13, Ubuntu 18.04
+- **RAM**: 4GB (8GB recommended)
+- **Storage**: 500MB for app + dependencies
+- **Network**: Internet connection for translation APIs
+
+### Recommended Setup
+- **OS**: Windows 11, macOS 12+, Ubuntu 20.04+
+- **RAM**: 8GB+ for optimal performance
+- **Audio**: Dedicated sound card for better system audio capture
+- **Network**: Stable broadband for real-time processing
+
+## 🐛 Troubleshooting
+
+### Audio Issues
+**No microphone devices detected:**
+- Check microphone permissions in OS settings
+- Restart the application
+- Try running as administrator (Windows)
+
+**System audio not working:**
+- Ensure virtual audio drivers are installed
+- Check audio routing in system settings
+- Verify FFmpeg is installed and accessible
+
+**Poor audio quality:**
+- Check microphone settings
+- Reduce background noise
+- Ensure stable internet connection
+
+### Translation Issues
+**"Failed to initialize Speech client":**
+- Verify `credentials.json` file exists and is valid
+- Check Google Cloud project and API enablement
+- Ensure service account has correct permissions
+
+**Slow translation:**
+- Check internet connection speed
+- Monitor API quota usage
+- Clear translation cache if memory is low
+
+**Inaccurate transcription:**
+- Speak clearly and at moderate pace
+- Check if source language is correct
+- Reduce background noise
+
+### Application Issues
+**App won't start:**
+- Check Node.js version (16+ required)
+- Run `npm install` to ensure dependencies
+- Check console for error messages
+
+**Global shortcuts not working:**
+- Restart application
+- Check for conflicting shortcuts
+- Run with elevated permissions if needed
+
+## 🤝 Contributing
+
+### Development Setup
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature-desktop-enhancement`
+3. Follow the existing code architecture
+4. Test on multiple platforms
+5. Submit pull request
+
+### Code Architecture
+- **main.js**: Electron main process, window management, system integration
+- **renderer.js**: UI coordination and event handling
+- **audioCapture.js**: Cross-platform audio input handling
+- **transcriber.js**: Google Speech-to-Text API integration
+- **translator.js**: Google Translate API with caching
+
+### Testing
+```bash
+# Run in development mode
+npm run dev
+
+# Test builds
+npm run pack    # Package without installer
+npm run dist    # Full distribution build
+```
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **Google Cloud**: Speech-to-Text and Translation APIs
+- **Electron**: Cross-platform desktop framework
+- **FFmpeg**: Audio processing capabilities
+- **Node.js Community**: Audio capture libraries
+- **Contributors**: All developers who helped improve this project
+
+## 📞 Support & Links
+
+### Documentation
+- [Electron Documentation](https://www.electronjs.org/docs)
+- [Google Cloud Speech-to-Text](https://cloud.google.com/speech-to-text/docs)
+- [Google Cloud Translation](https://cloud.google.com/translate/docs)
+
+### Community
+- [Issues](https://github.com/chirag23177/speech_to_text/issues): Bug reports and feature requests
+- [Discussions](https://github.com/chirag23177/speech_to_text/discussions): Community support
+- [Wiki](https://github.com/chirag23177/speech_to_text/wiki): Additional documentation
+
+### System Audio Setup Guides
+- [Windows Audio Loopback Setup](https://github.com/chirag23177/speech_to_text/wiki/Windows-Audio-Setup)
+- [macOS Audio Routing Guide](https://github.com/chirag23177/speech_to_text/wiki/macOS-Audio-Setup)
+- [Linux PulseAudio Configuration](https://github.com/chirag23177/speech_to_text/wiki/Linux-Audio-Setup)
+
+---
+
+**🌟 Transform your multilingual communication with real-time desktop translation!**
+
+*Desktop Version - Last updated: July 28, 2025*
 
 ## 🎯 Features
 
