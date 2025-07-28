@@ -1,6 +1,9 @@
 // Desktop App Implementation with Google Cloud APIs
 // This replaces the browser-based implementation with proper Google Cloud services
 
+// Desktop App Implementation with Socket.IO Real-time Streaming
+// Based on the working web app implementation
+
 window.speechTranslatorApp = {
   isRecording: false,
   mediaRecorder: null,
@@ -11,16 +14,232 @@ window.speechTranslatorApp = {
     target: 'es'
   },
   
-  // Initialize the app with Google Cloud APIs
+  // Socket.IO streaming properties (like web app)
+  socket: null,
+  streamingActive: false,
+  isStreamingMode: true,
+  backendUrl: 'http://localhost:3001',
+  
+  // Real-time streaming properties
+  autoCommitTimer: null,
+  autoCommitInterval: 5000, // 5 seconds
+  lastCommitTime: 0,
+  pendingInterimText: '',
+  wordCompleteDelay: 1000,
+  
+  // Initialize the app with Socket.IO streaming
   async init() {
-    console.log('Initializing Speech Translator with Google Cloud APIs...');
+    console.log('Initializing Speech Translator with Socket.IO streaming...');
     this.setupUI();
     await this.loadLanguages();
     this.setupEventListeners();
     await this.testGoogleCloudConnection();
+    this.initializeSocketIO(); // Initialize Socket.IO like web app
   },
   
-  // Test Google Cloud connection
+  // Initialize Socket.IO connection (from web app)
+  initializeSocketIO() {
+    try {
+      console.log('Initializing Socket.IO connection...');
+      
+      // Load Socket.IO from CDN or local installation
+      if (typeof io === 'undefined') {
+        console.warn('Socket.IO not loaded, loading from CDN...');
+        const script = document.createElement('script');
+        script.src = 'https://cdn.socket.io/4.7.2/socket.io.min.js';
+        script.onload = () => {
+          this.connectSocket();
+        };
+        document.head.appendChild(script);
+      } else {
+        this.connectSocket();
+      }
+    } catch (error) {
+      console.error('Failed to initialize Socket.IO:', error);
+      this.updateStatus('Socket.IO initialization failed - using fallback mode');
+      this.isStreamingMode = false;
+    }
+  },
+  
+  // Connect to Socket.IO server (from web app)
+  connectSocket() {
+    try {
+      this.socket = io(this.backendUrl, {
+        transports: ['websocket', 'polling'],
+        timeout: 10000
+      });
+      
+      this.setupSocketEvents();
+      console.log('Socket.IO connection established');
+    } catch (error) {
+      console.error('Socket.IO connection failed:', error);
+      this.isStreamingMode = false;
+    }
+  },
+  
+  // Set up Socket.IO event handlers (from web app)
+  setupSocketEvents() {
+    if (!this.socket) return;
+    
+    this.socket.on('connect', () => {
+      console.log('Connected to Socket.IO server');
+      this.updateStatus('Real-time streaming ready');
+    });
+    
+    this.socket.on('disconnect', () => {
+      console.log('Disconnected from Socket.IO server');
+      this.updateStatus('Streaming disconnected');
+    });
+    
+    this.socket.on('transcription-result', (data) => {
+      console.log('Received transcription-result:', data);
+      this.handleStreamingResult(data);
+    });
+    
+    this.socket.on('voice-activity', (data) => {
+      console.log('Received voice-activity:', data);
+      this.handleVoiceActivity(data);
+    });
+    
+    this.socket.on('streaming-error', (error) => {
+      console.error('Streaming error:', error);
+      this.updateStatus('Streaming error: ' + error.message);
+    });
+    
+    this.socket.on('stream-started', () => {
+      console.log('Stream started successfully');
+      this.updateStatus('Streaming active');
+    });
+    
+    this.socket.on('stream-ended', () => {
+      console.log('Stream ended');
+      this.updateStatus('Stream ended');
+    });
+    
+    this.socket.on('connect_error', (error) => {
+      console.error('Socket.IO connection error:', error);
+      this.updateStatus('Connection error - check if server is running');
+      this.isStreamingMode = false;
+    });
+  },
+  
+  // Handle streaming results (from web app)
+  handleStreamingResult(data) {
+    if (!data || typeof data !== 'object') {
+      console.warn('Invalid streaming result data:', data);
+      return;
+    }
+    
+    const { transcript, isFinal, confidence, languageCode } = data;
+    
+    if (!transcript) {
+      console.log('Empty transcript received');
+      return;
+    }
+    
+    console.log('Streaming result:', { transcript, isFinal, confidence });
+    
+    try {
+      if (isFinal) {
+        // Handle final result
+        this.handleFinalTranscript(transcript);
+        this.pendingInterimText = ''; // Clear interim text
+        this.resetAutoCommitTimer();
+      } else {
+        // Handle interim result
+        this.handleInterimTranscript(transcript);
+        this.pendingInterimText = transcript;
+        this.setAutoCommitTimer();
+      }
+    } catch (error) {
+      console.error('Error handling streaming result:', error);
+    }
+  },
+  
+  // Handle final transcript
+  handleFinalTranscript(transcript) {
+    if (!transcript || transcript.trim() === '') return;
+    
+    console.log('Final transcript:', transcript);
+    this.displayTranscript(transcript, true);
+    this.translateText(transcript);
+    this.lastCommitTime = Date.now();
+  },
+  
+  // Handle interim transcript
+  handleInterimTranscript(transcript) {
+    if (!transcript || transcript.trim() === '') return;
+    
+    console.log('Interim transcript:', transcript);
+    this.displayTranscript(transcript, false);
+  },
+  
+  // Handle voice activity detection (from web app)
+  handleVoiceActivity(data) {
+    const { event, timestamp } = data;
+    const isActive = event === 'SPEECH_ACTIVITY_BEGIN';
+    console.log('Voice activity:', isActive ? 'detected' : 'ended');
+    
+    // Update UI to show voice activity
+    const statusElement = document.getElementById('status');
+    if (statusElement) {
+      if (isActive) {
+        statusElement.classList.add('voice-active');
+      } else {
+        statusElement.classList.remove('voice-active');
+      }
+    }
+  },
+  
+  // Auto-commit timer management (from web app)
+  setAutoCommitTimer() {
+    this.resetAutoCommitTimer();
+    
+    this.autoCommitTimer = setTimeout(() => {
+      if (this.pendingInterimText && this.isRecording) {
+        console.log('Auto-committing interim text:', this.pendingInterimText);
+        this.handleFinalTranscript(this.pendingInterimText);
+        this.pendingInterimText = '';
+      }
+    }, this.autoCommitInterval);
+  },
+  
+  resetAutoCommitTimer() {
+    if (this.autoCommitTimer) {
+      clearTimeout(this.autoCommitTimer);
+      this.autoCommitTimer = null;
+    }
+  },
+  
+  // Update the transcript display with streaming results
+  updateStreamingTranscript() {
+    const transcriptDiv = document.getElementById('transcriptDisplay');
+    if (!transcriptDiv) return;
+    
+    let displayHTML = '';
+    
+    // Show final transcript
+    if (this.finalTranscript.trim()) {
+      displayHTML += `<div class="transcript-text final">${this.finalTranscript.trim()}</div>`;
+    }
+    
+    // Show current interim transcript
+    if (this.currentTranscript.trim()) {
+      displayHTML += `<div class="transcript-text interim">${this.currentTranscript}</div>`;
+    }
+    
+    // Show status if no transcript yet
+    if (!displayHTML) {
+      if (this.isRecording) {
+        displayHTML = '<div class="transcript-placeholder">🎤 Listening... Speak clearly for 2-3 seconds</div>';
+      } else {
+        displayHTML = '<div class="transcript-placeholder">Click "Start Recording" to begin</div>';
+      }
+    }
+    
+    transcriptDiv.innerHTML = displayHTML;
+    transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+  },
   async testGoogleCloudConnection() {
     try {
       const isConnected = await window.electronAPI.testGoogleCloudConnection();
@@ -118,13 +337,15 @@ window.speechTranslatorApp = {
     }
   },
   
-  // Start recording audio
+  // Start recording audio with quasi-streaming (frequent batch processing)
   async startRecording() {
     if (this.isRecording) return;
     
     try {
-      console.log('Starting recording...');
+      console.log('Starting real-time streaming recording...');
       this.audioChunks = [];
+      this.pendingInterimText = '';
+      this.lastCommitTime = Date.now();
       
       // Get microphone access
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -137,34 +358,25 @@ window.speechTranslatorApp = {
         }
       });
       
-      // Set up MediaRecorder for capturing audio
-      this.mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
+      // Choose streaming mode based on Socket.IO availability
+      if (this.isStreamingMode && this.socket && this.socket.connected) {
+        console.log('Using Socket.IO real-time streaming mode');
+        await this.startSocketIOStreaming(stream);
+      } else {
+        console.log('Socket.IO not available, using fallback mode');
+        await this.startFallbackMode(stream);
+      }
       
-      this.mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          this.audioChunks.push(event.data);
-        }
-      };
-      
-      this.mediaRecorder.onstop = () => {
-        this.processRecordedAudio();
-      };
-      
-      // Start recording
-      this.mediaRecorder.start(1000); // Capture data every 1 second
       this.isRecording = true;
       this.updateRecordButton();
-      this.updateStatus('Recording with Google Cloud Speech-to-Text...');
+      this.updateStatus('Recording - real-time streaming active');
       this.updateModeIndicator();
       
       // Clear previous content
-      this.updateTranscript('Recording started. Speak clearly into your microphone...');
+      const transcriptDiv = document.getElementById('transcriptDisplay');
       const translationDiv = document.getElementById('translationDisplay');
-      if (translationDiv) {
-        translationDiv.innerHTML = 'Translation will appear here after speech is processed...';
-      }
+      if (transcriptDiv) transcriptDiv.innerHTML = 'Listening...';
+      if (translationDiv) translationDiv.innerHTML = 'Translations will appear here...';
       
       // Set up audio visualization
       this.setupAudioVisualization(stream);
@@ -176,13 +388,175 @@ window.speechTranslatorApp = {
     }
   },
   
-  // Stop recording and process audio
-  stopRecording() {
+  // Start Socket.IO streaming (from web app)
+  async startSocketIOStreaming(stream) {
+    if (!this.socket || !this.socket.connected) {
+      throw new Error('Socket.IO not connected');
+    }
+    
+    console.log('Starting Socket.IO streaming...');
+    this.streamingActive = true;
+    
+    // Start streaming session
+    console.log('Emitting start-stream with config:', {
+      language: this.currentLanguagePair.source,
+      sampleRate: 16000,
+      encoding: 'WEBM_OPUS'
+    });
+    
+    this.socket.emit('start-stream', {
+      language: this.currentLanguagePair.source,
+      sampleRate: 16000,
+      encoding: 'WEBM_OPUS'
+    });
+    
+    // Set up MediaRecorder for real-time streaming
+    this.mediaRecorder = new MediaRecorder(stream, {
+      mimeType: 'audio/webm;codecs=opus'
+    });
+    
+    this.mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0 && this.streamingActive) {
+        console.log('Streaming audio chunk, size:', event.data.size);
+        
+        // Convert blob to buffer and send via Socket.IO
+        event.data.arrayBuffer().then(buffer => {
+          if (this.socket && this.socket.connected) {
+            console.log('Sending audio data via Socket.IO, buffer size:', buffer.byteLength);
+            this.socket.emit('audio-data', buffer);
+          } else {
+            console.warn('Socket not connected, cannot send audio data');
+          }
+        }).catch(error => {
+          console.error('Error converting audio data:', error);
+        });
+      } else if (event.data.size === 0) {
+        console.warn('Received empty audio chunk');
+      } else if (!this.streamingActive) {
+        console.log('Streaming not active, ignoring audio chunk');
+      }
+    };
+    
+    this.mediaRecorder.onstop = () => {
+      console.log('Socket.IO streaming stopped');
+      this.stopSocketIOStreaming();
+    };
+    
+    // Start with smaller chunks for real-time streaming
+    this.mediaRecorder.start(250); // 250ms chunks for real-time feel
+  },
+  
+  // Start fallback mode (simplified batch processing)
+  async startFallbackMode(stream) {
+    console.log('Starting fallback batch mode...');
+    
+    this.mediaRecorder = new MediaRecorder(stream, {
+      mimeType: 'audio/webm;codecs=opus'
+    });
+    
+    this.mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        this.audioChunks.push(event.data);
+      }
+    };
+    
+    this.mediaRecorder.onstop = () => {
+      if (this.audioChunks.length > 0) {
+        this.processBatchAudio();
+      }
+    };
+    
+    this.mediaRecorder.start();
+  },
+  
+  // Process accumulated audio chunks for better recognition
+  async processAccumulatedChunks() {
+    try {
+      if (this.audioChunks.length === 0) return;
+      
+      console.log(`Processing ${this.audioChunks.length} accumulated chunks...`);
+      
+      // Show interim processing status
+      this.currentTranscript = 'Processing speech...';
+      this.updateStreamingTranscript();
+      
+      // Combine chunks into a larger blob for better recognition
+      const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm;codecs=opus' });
+      
+      // Convert blob to ArrayBuffer for processing
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const audioArray = Array.from(uint8Array);
+      
+      console.log('Combined audio data prepared, size:', audioArray.length, 'bytes');
+      
+      // Send to Google Cloud Speech-to-Text
+      const transcriptionResult = await window.electronAPI.transcribeAudio(
+        audioArray, 
+        this.currentLanguagePair.source
+      );
+      
+      if (transcriptionResult.transcript && transcriptionResult.transcript.trim()) {
+        console.log('Accumulated chunk transcription received:', transcriptionResult.transcript);
+        
+        // Add to final transcript (avoid duplicates)
+        const newText = transcriptionResult.transcript.trim();
+        if (!this.finalTranscript.includes(newText)) {
+          this.finalTranscript += newText + ' ';
+        }
+        this.currentTranscript = ''; // Clear interim
+        
+        // Update display immediately
+        this.updateStreamingTranscript();
+        
+        // Translate the new text
+        await this.translateText(newText);
+        
+      } else {
+        console.log('No speech detected in accumulated chunks');
+        this.currentTranscript = ''; // Clear processing message
+        this.updateStreamingTranscript();
+      }
+      
+      // Clear processed chunks but keep the last one for continuity
+      const lastChunk = this.audioChunks.pop(); // Keep last chunk
+      this.audioChunks = lastChunk ? [lastChunk] : [];
+      
+    } catch (error) {
+      console.error('Error processing accumulated chunks:', error);
+      this.currentTranscript = 'Error processing speech';
+      this.updateStreamingTranscript();
+      
+      // Clear chunks on error
+      this.audioChunks = [];
+    }
+  },
+  
+  // Stop Socket.IO streaming
+  stopSocketIOStreaming() {
+    if (this.socket && this.socket.connected && this.streamingActive) {
+      console.log('Stopping Socket.IO streaming...');
+      this.socket.emit('stop-stream');
+      this.streamingActive = false;
+    }
+  },
+  
+  // Stop recording
+  async stopRecording() {
     if (!this.isRecording) return;
     
     console.log('Stopping recording...');
     this.isRecording = false;
     
+    // Reset auto-commit timer
+    this.resetAutoCommitTimer();
+    
+    // Handle different recording modes
+    if (this.streamingActive) {
+      this.stopSocketIOStreaming();
+    }
+    
+    // Stop MediaRecorder
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       this.mediaRecorder.stop();
     }
@@ -192,29 +566,75 @@ window.speechTranslatorApp = {
       this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
     }
     
+    // Process any pending interim text as final
+    if (this.pendingInterimText && this.pendingInterimText.trim()) {
+      console.log('Processing pending interim text as final:', this.pendingInterimText);
+      this.handleFinalTranscript(this.pendingInterimText);
+      this.pendingInterimText = '';
+    }
+    
     this.updateRecordButton();
-    this.updateStatus('Processing recorded audio...');
+    this.updateStatus('Recording stopped');
     this.updateModeIndicator();
   },
   
-  // Process the recorded audio with Google Cloud Speech-to-Text
-  async processRecordedAudio() {
+  // Display transcript (unified method for both interim and final)
+  displayTranscript(transcript, isFinal = false) {
+    const transcriptDiv = document.getElementById('transcriptDisplay');
+    if (!transcriptDiv) return;
+    
+    const timestamp = new Date().toLocaleTimeString();
+    const transcriptClass = isFinal ? 'final' : 'interim';
+    
+    if (isFinal) {
+      // Add to existing transcripts
+      const finalDiv = document.createElement('div');
+      finalDiv.className = `transcript-item ${transcriptClass}`;
+      finalDiv.innerHTML = `
+        <div class="transcript-text">${transcript}</div>
+        <div class="transcript-meta">
+          <span>${timestamp}</span>
+          <span>Language: ${this.currentLanguagePair.source}</span>
+        </div>
+      `;
+      transcriptDiv.appendChild(finalDiv);
+      
+      // Scroll to bottom
+      transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+    } else {
+      // Update or create interim display
+      let interimDiv = transcriptDiv.querySelector('.interim');
+      if (!interimDiv) {
+        interimDiv = document.createElement('div');
+        interimDiv.className = `transcript-item ${transcriptClass}`;
+        transcriptDiv.appendChild(interimDiv);
+      }
+      
+      interimDiv.innerHTML = `
+        <div class="transcript-text">${transcript}</div>
+        <div class="transcript-meta">
+          <span>Listening...</span>
+        </div>
+      `;
+    }
+  },
+  
+  // Fallback batch processing for when streaming fails
+  async processBatchAudio() {
     try {
       if (this.audioChunks.length === 0) {
         this.updateStatus('No audio recorded');
         return;
       }
       
-      console.log('Processing audio with Google Cloud Speech-to-Text...');
-      this.updateStatus('Transcribing audio with Google Cloud...');
+      console.log('Processing audio in batch mode (streaming fallback)...');
+      this.updateStatus('Transcribing audio...');
       
       // Combine audio chunks into a single blob
       const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm;codecs=opus' });
       
       // Convert blob to ArrayBuffer for processing
       const arrayBuffer = await audioBlob.arrayBuffer();
-      
-      // Convert ArrayBuffer to Uint8Array for transmission
       const uint8Array = new Uint8Array(arrayBuffer);
       const audioArray = Array.from(uint8Array);
       
@@ -226,36 +646,19 @@ window.speechTranslatorApp = {
         this.currentLanguagePair.source
       );
       
-      if (transcriptionResult.transcript && transcriptionResult.transcript.trim()) {
-        console.log('Transcription received:', transcriptionResult);
-        
-        // Update transcript display
-        this.updateTranscript(
-          `<div class="transcript-text final">
-            ${transcriptionResult.transcript}
-          </div>
-          <div class="transcript-meta">
-            <span>Language: ${this.currentLanguagePair.source}</span>
-            <span>Confidence: ${(transcriptionResult.confidence * 100).toFixed(1)}%</span>
-            <span>Google Cloud Speech-to-Text</span>
-          </div>`
-        );
-        
-        // Translate the text
-        await this.translateText(transcriptionResult.transcript);
-        
-        this.updateStatus('Transcription and translation complete');
-        
+      if (transcriptionResult && transcriptionResult.text) {
+        console.log('Batch transcription result:', transcriptionResult.text);
+        this.displayTranscript(transcriptionResult.text, true);
+        await this.translateText(transcriptionResult.text);
+        this.updateStatus('Transcription complete');
       } else {
-        console.log('No speech detected in audio');
-        this.updateTranscript('No speech detected. Please try speaking louder or closer to the microphone.');
+        console.log('No transcription result from batch processing');
         this.updateStatus('No speech detected');
       }
       
     } catch (error) {
-      console.error('Error processing audio:', error);
-      this.updateStatus('Error processing audio');
-      this.updateTranscript(`Error processing audio: ${error.message}`);
+      console.error('Error in batch processing:', error);
+      this.updateStatus('Error: ' + error.message);
     }
   },
   

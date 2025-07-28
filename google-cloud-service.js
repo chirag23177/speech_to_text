@@ -25,12 +25,26 @@ class GoogleCloudSpeechService {
       // Audio configuration
       this.audioConfig = {
         encoding: 'WEBM_OPUS', // For browser audio
-        sampleRateHertz: 16000,
+        sampleRateHertz: 48000, // WebM typically uses 48kHz
         languageCode: 'en-US',
         enableAutomaticPunctuation: true,
         enableWordTimeOffsets: true,
         model: 'latest_long', // Best for longer audio
       };
+      
+      // Streaming configuration (using FLAC which supports streaming better)
+      this.streamConfig = {
+        config: {
+          encoding: 'FLAC', // FLAC is better supported for streaming than WEBM_OPUS
+          sampleRateHertz: 16000,
+          languageCode: 'en-US',
+          enableAutomaticPunctuation: true,
+        },
+        interimResults: true, // Get partial results while speaking
+      };
+      
+      // Track active streams
+      this.activeStreams = new Map();
       
       console.log('Google Cloud Speech and Translate services initialized successfully');
       console.log('Using credentials from:', credentialsPath);
@@ -42,10 +56,142 @@ class GoogleCloudSpeechService {
   }
   
   // Configure speech recognition settings
-  configureSpeech(languageCode = 'en-US', sampleRate = 16000) {
+  configureSpeech(languageCode = 'en-US', sampleRate = 48000) {
     this.audioConfig.languageCode = languageCode;
     this.audioConfig.sampleRateHertz = sampleRate;
+    this.streamConfig.config.languageCode = languageCode;
+    this.streamConfig.config.sampleRateHertz = sampleRate;
     console.log('Speech config updated:', { languageCode, sampleRate });
+  }
+  
+  // Start streaming speech recognition
+  startStreamingRecognition(sessionId, languageCode = 'en-US', onTranscript, onError) {
+    try {
+      console.log(`Starting streaming recognition for session: ${sessionId}`);
+      
+      // Update config for this session
+      const streamConfig = {
+        ...this.streamConfig,
+        config: {
+          ...this.streamConfig.config,
+          languageCode: languageCode
+        }
+      };
+      
+      console.log('Streaming config:', JSON.stringify(streamConfig, null, 2));
+      
+      // Create streaming recognition request
+      const recognizeStream = this.speechClient
+        .streamingRecognize(streamConfig)
+        .on('error', (error) => {
+          console.error('Streaming recognition error:', error);
+          this.stopStreamingRecognition(sessionId);
+          if (onError) onError(error);
+        })
+        .on('data', (data) => {
+          console.log('Streaming data received:', data);
+          
+          if (data.results && data.results[0] && data.results[0].alternatives[0]) {
+            const result = data.results[0];
+            const transcript = result.alternatives[0].transcript;
+            const confidence = result.alternatives[0].confidence || 0;
+            const isFinal = result.isFinal;
+            
+            console.log(`Streaming result [${sessionId}]:`, {
+              transcript,
+              confidence,
+              isFinal
+            });
+            
+            if (onTranscript) {
+              onTranscript({
+                transcript,
+                confidence,
+                isFinal,
+                languageCode
+              });
+            }
+          }
+        });
+      
+      // Store the stream for this session
+      this.activeStreams.set(sessionId, {
+        stream: recognizeStream,
+        configSent: false
+      });
+      
+      console.log(`Streaming recognition started for session: ${sessionId}`);
+      return true;
+      
+    } catch (error) {
+      console.error('Error starting streaming recognition:', error);
+      if (onError) onError(error);
+      return false;
+    }
+  }
+  
+  // Send audio chunk to streaming recognition
+  sendAudioChunk(sessionId, audioBuffer) {
+    try {
+      const streamData = this.activeStreams.get(sessionId);
+      if (!streamData) {
+        console.warn(`No active stream found for session: ${sessionId}`);
+        return false;
+      }
+      
+      const { stream } = streamData;
+      
+      // Ensure we have a proper Buffer
+      if (!Buffer.isBuffer(audioBuffer)) {
+        audioBuffer = Buffer.from(audioBuffer);
+      }
+      
+      // Send ONLY audio data (not config) after the stream is created
+      // The config was already sent when the stream was created
+      stream.write({
+        audioContent: audioBuffer
+      });
+      
+      console.log(`Sent audio chunk for session ${sessionId}, size: ${audioBuffer.length} bytes`);
+      return true;
+      
+    } catch (error) {
+      console.error('Error sending audio chunk:', error);
+      return false;
+    }
+  }
+  
+  // Stop streaming recognition
+  stopStreamingRecognition(sessionId) {
+    try {
+      const streamData = this.activeStreams.get(sessionId);
+      if (streamData) {
+        console.log(`Stopping streaming recognition for session: ${sessionId}`);
+        const { stream } = streamData;
+        stream.end();
+        this.activeStreams.delete(sessionId);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error stopping streaming recognition:', error);
+      return false;
+    }
+  }
+  
+  // Stop all active streams
+  stopAllStreams() {
+    console.log('Stopping all active streaming sessions...');
+    for (const [sessionId, streamData] of this.activeStreams) {
+      try {
+        const { stream } = streamData;
+        stream.end();
+        console.log(`Stopped stream for session: ${sessionId}`);
+      } catch (error) {
+        console.error(`Error stopping stream ${sessionId}:`, error);
+      }
+    }
+    this.activeStreams.clear();
   }
   
   // Transcribe audio buffer using Google Cloud Speech-to-Text

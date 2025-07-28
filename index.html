@@ -272,6 +272,14 @@
             font-weight: 500;
         }
         
+        .transcript-placeholder {
+            opacity: 0.6;
+            font-style: italic;
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 20px;
+        }
+        
         .transcript-meta {
             display: flex;
             gap: 15px;
@@ -671,6 +679,7 @@
     </div>
 
     <!-- Scripts -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="app-google-cloud.js"></script>
     <script>
         // Fallback if renderer.js fails to load

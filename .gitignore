@@ -93,3 +93,5 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+server_web_app.js
+script_web_app.js

@@ -417,6 +417,12 @@ app.on('window-all-closed', () => {
 // Handle before quit
 app.on('before-quit', () => {
   app.isQuiting = true;
+  
+  // Clean up Google Cloud streaming sessions
+  if (googleCloudService) {
+    console.log('Cleaning up Google Cloud streaming sessions...');
+    googleCloudService.stopAllStreams();
+  }
 });
 
 // Unregister shortcuts when app will quit
@@ -478,6 +484,83 @@ ipcMain.handle('transcribe-audio', async (event, audioData, languageCode) => {
     return await googleCloudService.transcribeAudio(audioBuffer, languageCode);
   } catch (error) {
     console.error('Error in transcribe-audio handler:', error);
+    throw error;
+  }
+});
+
+// Streaming speech recognition handlers
+ipcMain.handle('start-streaming-recognition', async (event, sessionId, languageCode) => {
+  if (!googleCloudService) {
+    throw new Error('Google Cloud service not initialized');
+  }
+  
+  try {
+    console.log(`Starting streaming recognition for session: ${sessionId}`);
+    
+    const success = googleCloudService.startStreamingRecognition(
+      sessionId,
+      languageCode,
+      // onTranscript callback
+      (result) => {
+        // Send transcript result back to renderer
+        event.sender.send('streaming-transcript', {
+          sessionId,
+          ...result
+        });
+      },
+      // onError callback
+      (error) => {
+        console.error(`Streaming error for session ${sessionId}:`, error);
+        event.sender.send('streaming-transcript', {
+          sessionId,
+          error: error.message
+        });
+      }
+    );
+    
+    return { success, sessionId };
+  } catch (error) {
+    console.error('Error starting streaming recognition:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('send-audio-chunk', async (event, sessionId, audioData) => {
+  if (!googleCloudService) {
+    throw new Error('Google Cloud service not initialized');
+  }
+  
+  try {
+    // Convert array or ArrayBuffer to Buffer
+    let audioBuffer;
+    if (Array.isArray(audioData)) {
+      audioBuffer = Buffer.from(audioData);
+    } else if (audioData instanceof ArrayBuffer) {
+      audioBuffer = Buffer.from(audioData);
+    } else if (Buffer.isBuffer(audioData)) {
+      audioBuffer = audioData;
+    } else {
+      throw new Error('Unsupported audio data format');
+    }
+    
+    const success = googleCloudService.sendAudioChunk(sessionId, audioBuffer);
+    return { success };
+  } catch (error) {
+    console.error('Error sending audio chunk:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('stop-streaming-recognition', async (event, sessionId) => {
+  if (!googleCloudService) {
+    throw new Error('Google Cloud service not initialized');
+  }
+  
+  try {
+    const success = googleCloudService.stopStreamingRecognition(sessionId);
+    return { success };
+  } catch (error) {
+    console.error('Error stopping streaming recognition:', error);
     throw error;
   }
 });
