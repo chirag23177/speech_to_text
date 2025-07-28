@@ -1,33 +1,25 @@
 {
   "name": "real-time-speech-translator-desktop",
   "version": "1.0.0",
-  "description": "A cross-platform desktop application for real-time speech transcription and translation with system audio capture",
+  "description": "A desktop application for real-time speech transcription and translation using Google Cloud APIs",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
+    "server": "node server.js",
     "build": "electron-builder",
-    "build-win": "electron-builder --win",
-    "build-mac": "electron-builder --mac",
-    "build-linux": "electron-builder --linux",
-    "pack": "electron-builder --dir",
     "dist": "electron-builder --publish=never",
-    "web-start": "node server.js",
-    "web-dev": "nodemon server.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "speech-to-text",
     "real-time-translation",
     "google-cloud",
-    "translation",
     "electron",
     "desktop-app",
-    "system-audio",
-    "nodejs",
-    "multilingual",
+    "socket.io",
     "speech-recognition",
-    "audio-capture",
-    "cross-platform"
+    "translation"
   ],
   "author": "chirag23177",
   "license": "MIT",
@@ -44,19 +36,13 @@
     "@google-cloud/translate": "^8.5.1",
     "cors": "^2.8.5",
     "express": "^4.21.2",
-    "ffmpeg-static": "^5.2.0",
-    "fluent-ffmpeg": "^2.1.2",
     "multer": "^2.0.2",
-    "node-record-lpcm16": "^1.0.1",
     "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1",
-    "speaker": "^0.5.4",
-    "wav": "^1.0.2"
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "electron": "^37.2.4",
-    "electron-builder": "^24.9.1",
-    "nodemon": "^3.0.1"
+    "electron-builder": "^24.9.1"
   },
   "build": {
     "appId": "com.chirag23177.speech-translator",
@@ -66,10 +52,10 @@
     },
     "files": [
       "main.js",
-      "renderer.js",
-      "transcriber.js",
-      "translator.js",
-      "audioCapture.js",
+      "preload.js",
+      "app-google-cloud.js",
+      "google-cloud-service.js",
+      "server.js",
       "index.html",
       "styles.css",
       "credentials.json",
@@ -77,21 +63,17 @@
       "package.json"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
+      "target": "nsis"
     },
     "mac": {
-      "target": "dmg",
-      "icon": "assets/icon.icns"
+      "target": "dmg"
     },
     "linux": {
-      "target": "AppImage",
-      "icon": "assets/icon.png"
+      "target": "AppImage"
     }
   },
   "engines": {
-    "node": ">=16.0.0",
+    "node": ">=20.0.0",
     "npm": ">=8.0.0"
-  },
-  "type": "commonjs"
+  }
 }
