@@ -759,20 +759,6 @@
                         <i class="fas fa-redo"></i> Retry Connection
                     </button>
                     
-                    <div style="margin-bottom: 12px;">
-                        <label for="audioSourceSelector" style="font-size: 13px; color: var(--text-secondary); font-weight: 500; margin-bottom: 6px; display: block;">
-                            <i class="fas fa-volume-up" style="margin-right: 6px;"></i>Audio Source:
-                        </label>
-                        <select id="audioSourceSelector" class="device-selector">
-                            <option value="microphone">🎤 Microphone (includes system audio if stereo mix enabled)</option>
-                            <option value="system">🔊 System Audio Only (screen share)</option>
-                            <option value="both">🎤🔊 Enhanced (Mic + Additional System Audio)</option>
-                        </select>
-                        <div id="stereoMixStatus" style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: none;">
-                            <i class="fas fa-info-circle"></i> <span id="stereoMixText">Checking audio capabilities...</span>
-                        </div>
-                    </div>
-                    
                     <div class="audio-visualizer" id="audioVisualizer">
                         <!-- Audio visualization bars will be generated -->
                         <div class="bar"></div>
@@ -1101,10 +1087,6 @@
                         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);">
                             <span>Swap Languages</span>
                             <span style="color: var(--accent-color); font-family: monospace;">Ctrl + S</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);">
-                            <span>Cycle Audio Source</span>
-                            <span style="color: var(--accent-color); font-family: monospace;">Ctrl + A</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);">
                             <span>Toggle Theme</span>

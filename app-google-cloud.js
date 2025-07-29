@@ -14,9 +14,6 @@ window.speechTranslatorApp = {
     target: 'es'
   },
   
-  // Audio source selection
-  audioSource: 'microphone', // Default to microphone only
-  
   // Socket.IO streaming properties (like web app)
   socket: null,
   streamingActive: false,
@@ -284,7 +281,6 @@ window.speechTranslatorApp = {
     const sourceSelect = document.getElementById('sourceLanguage');
     const targetSelect = document.getElementById('targetLanguage');
     const swapBtn = document.getElementById('swapLanguages');
-    const audioSourceSelect = document.getElementById('audioSourceSelector');
     
     if (recordBtn) {
       recordBtn.addEventListener('click', () => this.startRecording());
@@ -311,214 +307,17 @@ window.speechTranslatorApp = {
         console.log('Target language changed to:', e.target.value);
       });
     }
-    
-    // Handle audio source selection
-    if (audioSourceSelect) {
-      audioSourceSelect.addEventListener('change', (e) => {
-        this.audioSource = e.target.value;
-        console.log('Audio source changed to:', e.target.value);
-        this.updateStatus(`Audio source: ${this.getAudioSourceDescription(e.target.value)}`);
-      });
-      
-      // Set initial value
-      this.audioSource = audioSourceSelect.value;
-    }
   },
   
-  // Get human-readable audio source description
-  getAudioSourceDescription(source) {
-    switch (source) {
-      case 'microphone':
-        return 'Microphone (includes system audio if stereo mix enabled)';
-      case 'system':
-        return 'System Audio Only (screen share)';
-      case 'both':
-        return 'Enhanced (Mic + Additional System Audio)';
-      default:
-        return 'Unknown';
+  // Update status display
+  updateStatus(message) {
+    const statusElement = document.getElementById('status');
+    if (statusElement) {
+      statusElement.textContent = message;
     }
+    console.log('Status:', message);
   },
-  
-  // Get audio stream based on selected source
-  async getAudioStream() {
-    const audioConstraints = {
-      sampleRate: 16000,
-      channelCount: 1,
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true
-    };
-    
-    switch (this.audioSource) {
-      case 'microphone':
-        console.log('Getting microphone stream (may include system audio if stereo mix is enabled)...');
-        return await navigator.mediaDevices.getUserMedia({ 
-          audio: audioConstraints
-        });
-        
-      case 'system':
-        console.log('Getting system audio stream...');
-        // For system audio, try getDisplayMedia first (most reliable)
-        try {
-          return await navigator.mediaDevices.getDisplayMedia({
-            video: false,
-            audio: {
-              sampleRate: 16000,
-              channelCount: 1,
-              suppressLocalAudioPlayback: false
-            }
-          });
-        } catch (displayError) {
-          console.warn('getDisplayMedia failed, trying alternative methods:', displayError.message);
-          
-          // Alternative 1: Try to enumerate audio devices and find system audio
-          try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const audioInputs = devices.filter(device => device.kind === 'audioinput');
-            
-            // Look for stereo mix or similar system audio device
-            const systemDevice = audioInputs.find(device => 
-              device.label.toLowerCase().includes('stereo mix') ||
-              device.label.toLowerCase().includes('wave out mix') ||
-              device.label.toLowerCase().includes('loopback') ||
-              device.label.toLowerCase().includes('what u hear')
-            );
-            
-            if (systemDevice) {
-              console.log('Found system audio device:', systemDevice.label);
-              return await navigator.mediaDevices.getUserMedia({
-                audio: {
-                  ...audioConstraints,
-                  deviceId: { exact: systemDevice.deviceId }
-                }
-              });
-            }
-          } catch (enumError) {
-            console.warn('Device enumeration failed:', enumError.message);
-          }
-          
-          // Alternative 2: If stereo mix is enabled, regular getUserMedia might capture system audio
-          console.log('Attempting to use default audio input (may capture system audio if stereo mix is enabled)...');
-          return await navigator.mediaDevices.getUserMedia({ 
-            audio: audioConstraints
-          });
-        }
-        
-      case 'both':
-        console.log('Getting combined microphone and system audio...');
-        try {
-          // If stereo mix is enabled, microphone input already includes system audio
-          console.log('Note: If stereo mix is enabled, microphone input already includes system audio');
-          
-          // Get microphone stream (which may include system audio)
-          const micStream = await navigator.mediaDevices.getUserMedia({ 
-            audio: audioConstraints
-          });
-          
-          // Try to get additional system audio stream
-          let systemStream;
-          try {
-            systemStream = await navigator.mediaDevices.getDisplayMedia({
-              video: false,
-              audio: {
-                sampleRate: 16000,
-                channelCount: 1,
-                suppressLocalAudioPlayback: false
-              }
-            });
-            
-            // Combine both audio streams
-            const audioContext = new AudioContext();
-            const micSource = audioContext.createMediaStreamSource(micStream);
-            const systemSource = audioContext.createMediaStreamSource(systemStream);
-            const destination = audioContext.createMediaStreamDestination();
-            
-            // Mix both sources
-            micSource.connect(destination);
-            systemSource.connect(destination);
-            
-            console.log('Successfully combined microphone and additional system audio');
-            return destination.stream;
-            
-          } catch (error) {
-            console.log('Additional system audio not available, using microphone stream (which may include system audio via stereo mix)');
-            return micStream;
-          }
-          
-        } catch (error) {
-          console.warn('Combined audio capture failed, falling back to microphone:', error);
-          return await navigator.mediaDevices.getUserMedia({ 
-            audio: audioConstraints
-          });
-        }
-        
-      default:
-        console.log('Unknown audio source, defaulting to microphone');
-    }
-  },
-  
-  // Detect if stereo mix or similar system audio loopback is available
-  async detectStereoMix() {
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const audioInputs = devices.filter(device => device.kind === 'audioinput');
-      
-      const stereoMixDevice = audioInputs.find(device => 
-        device.label.toLowerCase().includes('stereo mix') ||
-        device.label.toLowerCase().includes('wave out mix') ||
-        device.label.toLowerCase().includes('loopback') ||
-        device.label.toLowerCase().includes('what u hear') ||
-        device.label.toLowerCase().includes('what you hear')
-      );
-      
-      if (stereoMixDevice) {
-        console.log('Stereo mix device detected:', stereoMixDevice.label);
-        return stereoMixDevice;
-      }
-      
-      return null;
-    } catch (error) {
-      console.warn('Could not detect stereo mix:', error);
-    }
-  },
-  
-  // Check audio capabilities and provide user feedback
-  async checkAudioCapabilities() {
-    try {
-      const stereoMixDevice = await this.detectStereoMix();
-      const statusDiv = document.getElementById('stereoMixStatus');
-      const statusText = document.getElementById('stereoMixText');
-      
-      if (statusDiv && statusText) {
-        statusDiv.style.display = 'block';
-        
-        if (stereoMixDevice) {
-          console.log('Stereo Mix detected - system audio will be included in microphone input');
-          statusText.innerHTML = `✅ Stereo Mix enabled: ${stereoMixDevice.label}`;
-          statusDiv.style.color = 'var(--success-color)';
-          this.updateStatus(`Ready - Stereo Mix enabled (${stereoMixDevice.label})`);
-        } else {
-          console.log('No stereo mix detected - microphone will capture microphone only');
-          statusText.innerHTML = '❌ Stereo Mix not detected - mic input only';
-          statusDiv.style.color = 'var(--text-muted)';
-          this.updateStatus(`Ready - Audio source: ${this.getAudioSourceDescription(this.audioSource)}`);
-        }
-      }
-    } catch (error) {
-      console.warn('Could not check audio capabilities:', error);
-      const statusDiv = document.getElementById('stereoMixStatus');
-      const statusText = document.getElementById('stereoMixText');
-      
-      if (statusDiv && statusText) {
-        statusDiv.style.display = 'block';
-        statusText.innerHTML = '⚠️ Could not detect audio capabilities';
-        statusDiv.style.color = 'var(--warning-color)';
-      }
-      
-      this.updateStatus(`Ready - Audio source: ${this.getAudioSourceDescription(this.audioSource)}`);
-    }
-  },
-  
+
   // Load available languages from Google Cloud
   async loadLanguages() {
     try {
@@ -557,7 +356,7 @@ window.speechTranslatorApp = {
       }
       
       console.log('Languages loaded successfully');
-      this.updateStatus(`Ready to record - Audio source: ${this.getAudioSourceDescription(this.audioSource)}`);
+      this.updateStatus('Ready to record');
       
     } catch (error) {
       console.error('Error loading languages:', error);
@@ -575,9 +374,16 @@ window.speechTranslatorApp = {
       this.pendingInterimText = '';
       this.lastCommitTime = Date.now();
       
-      // Get audio stream based on selected source
-      console.log(`Audio source: ${this.audioSource} (${this.getAudioSourceDescription(this.audioSource)})`);
-      const stream = await this.getAudioStream();
+      // Get audio stream from user's microphone
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
       
       // Choose streaming mode based on Socket.IO availability
       if (this.isStreamingMode && this.socket && this.socket.connected) {
@@ -590,7 +396,7 @@ window.speechTranslatorApp = {
       
       this.isRecording = true;
       this.updateRecordButton();
-      this.updateStatus(`Recording - ${this.getAudioSourceDescription(this.audioSource)}`);
+      this.updateStatus('Recording...');
       this.updateModeIndicator();
       
       // Clear previous content
@@ -605,28 +411,12 @@ window.speechTranslatorApp = {
     } catch (error) {
       console.error('Error starting recording:', error);
       
-      // Provide specific error messages based on audio source
       let errorMessage = 'Failed to start recording';
-      if (this.audioSource === 'system') {
-        if (error.message.includes('Permission denied') || error.message.includes('NotAllowedError')) {
-          errorMessage = 'System audio access denied. Please allow screen/audio sharing when prompted.';
-        } else if (error.message.includes('constraint') || error.message.includes('Malformed')) {
-          errorMessage = 'System audio not supported in this browser. Try using "Microphone" mode (may include system audio if stereo mix is enabled).';
-        } else {
-          errorMessage = 'Failed to access system audio. If you have stereo mix enabled, try "Microphone" mode instead.';
-        }
-      } else if (this.audioSource === 'both') {
-        errorMessage = 'Failed to access combined audio sources. Trying microphone only...';
-        // Try falling back to microphone only
-        try {
-          this.audioSource = 'microphone';
-          document.getElementById('audioSourceSelector').value = 'microphone';
-          await this.startRecording();
-          return;
-        } catch (fallbackError) {
-          errorMessage = 'Failed to access any audio source. Please check permissions.';
-        }
-      } else if (this.audioSource === 'microphone') {
+      if (error.message.includes('Permission denied') || error.message.includes('NotAllowedError')) {
+        errorMessage = 'Microphone access denied. Please allow microphone access and try again.';
+      } else if (error.message.includes('NotFoundError')) {
+        errorMessage = 'No microphone found. Please check your audio devices.';
+      } else {
         errorMessage = 'Failed to access microphone. Please check permissions and try again.';
       }
       
@@ -1511,12 +1301,6 @@ window.speechTranslatorApp = {
         this.swapLanguages();
       }
       
-      // Ctrl+A to cycle through audio sources
-      if (event.ctrlKey && event.key === 'a') {
-        event.preventDefault();
-        this.cycleAudioSource();
-      }
-      
       // Esc to stop recording
       if (event.key === 'Escape' && this.isRecording) {
         this.stopRecording();
@@ -1524,23 +1308,6 @@ window.speechTranslatorApp = {
     });
     
     console.log('Event listeners set up');
-  },
-  
-  // Cycle through audio sources
-  cycleAudioSource() {
-    const audioSourceSelect = document.getElementById('audioSourceSelector');
-    if (!audioSourceSelect) return;
-    
-    const sources = ['microphone', 'system', 'both'];
-    const currentIndex = sources.indexOf(this.audioSource);
-    const nextIndex = (currentIndex + 1) % sources.length;
-    const nextSource = sources[nextIndex];
-    
-    audioSourceSelect.value = nextSource;
-    this.audioSource = nextSource;
-    
-    console.log('Audio source cycled to:', this.getAudioSourceDescription(nextSource));
-    this.updateStatus(`Audio source: ${this.getAudioSourceDescription(nextSource)}`);
   }
 };
 
