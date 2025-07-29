@@ -898,9 +898,9 @@
                         </label>
                     </div>
                     <div style="margin-bottom: 10px;">
-                        <label>
-                            <input type="checkbox" id="audioVisualization" checked> Audio visualization
-                        </label>
+                        <button id="showShortcuts" class="copy-button" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <i class="fas fa-keyboard"></i> Show Shortcuts
+                        </button>
                     </div>
                 </div>
             </div>
@@ -908,10 +908,7 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <div class="keyboard-shortcuts">
-                <strong>Shortcuts:</strong> Ctrl+Space (Record) | Ctrl+S (Swap) | Ctrl+T (Theme) | Ctrl+H (History) | Esc (Stop)
-            </div>
-            <div class="version-info">
+            <div class="version-info" style="text-align: center; width: 100%;">
                 Real-Time Speech Translator Desktop v1.0.0
             </div>
         </footer>
@@ -969,11 +966,11 @@
             });
             
             // Add a small status indicator
-            const statusDiv = document.createElement('div');
-            statusDiv.id = 'statusMessage';
-            statusDiv.style.cssText = 'position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; z-index: 1000;';
-            statusDiv.textContent = 'Loading...';
-            document.body.appendChild(statusDiv);
+            // const statusDiv = document.createElement('div');
+            // statusDiv.id = 'statusMessage';
+            // statusDiv.style.cssText = 'position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; z-index: 1000;';
+            // statusDiv.textContent = 'Loading...';
+            // document.body.appendChild(statusDiv);
             
             // Panel toggle functionality
             function setupPanelToggle(toggleId, panelId) {
@@ -997,6 +994,166 @@
             setupPanelToggle('historyToggle', 'historyPanel');
             setupPanelToggle('performanceToggle', 'performancePanel');
             setupPanelToggle('settingsToggle', 'settingsPanel');
+            
+            // Initialize history display when app loads
+            if (window.speechTranslatorApp) {
+                window.speechTranslatorApp.updateHistoryDisplay();
+            }
+            
+            // Clear history button event listener
+            document.getElementById('clearHistoryButton').addEventListener('click', () => {
+                if (confirm('Are you sure you want to clear all transcription history?')) {
+                    if (window.speechTranslatorApp) {
+                        window.speechTranslatorApp.clearHistory();
+                    }
+                }
+            });
+            
+            // Export history button event listener
+            document.getElementById('exportHistoryButton').addEventListener('click', () => {
+                if (window.speechTranslatorApp) {
+                    window.speechTranslatorApp.exportHistory();
+                }
+            });
+            
+            // Settings functionality
+            const autoTranslateCheckbox = document.getElementById('autoTranslate');
+            const saveHistoryCheckbox = document.getElementById('saveHistory');
+            const showShortcutsButton = document.getElementById('showShortcuts');
+            
+            // Auto-translate setting
+            if (autoTranslateCheckbox) {
+                // Load saved setting
+                autoTranslateCheckbox.checked = localStorage.getItem('autoTranslate') !== 'false';
+                
+                autoTranslateCheckbox.addEventListener('change', () => {
+                    localStorage.setItem('autoTranslate', autoTranslateCheckbox.checked);
+                    console.log('Auto-translate:', autoTranslateCheckbox.checked ? 'enabled' : 'disabled');
+                });
+            }
+            
+            // Save history setting
+            if (saveHistoryCheckbox) {
+                // Load saved setting
+                saveHistoryCheckbox.checked = localStorage.getItem('saveHistory') !== 'false';
+                
+                saveHistoryCheckbox.addEventListener('change', () => {
+                    localStorage.setItem('saveHistory', saveHistoryCheckbox.checked);
+                    console.log('Save history:', saveHistoryCheckbox.checked ? 'enabled' : 'disabled');
+                });
+            }
+            
+            // Show shortcuts functionality
+            if (showShortcutsButton) {
+                showShortcutsButton.addEventListener('click', () => {
+                    showShortcutsModal();
+                });
+            }
+            
+            // Shortcuts modal function
+            function showShortcutsModal() {
+                // Remove existing modal if present
+                const existingModal = document.getElementById('shortcutsModal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+                
+                // Create modal
+                const modal = document.createElement('div');
+                modal.id = 'shortcutsModal';
+                modal.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.7);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 10000;
+                `;
+                
+                const modalContent = document.createElement('div');
+                modalContent.style.cssText = `
+                    background: var(--background-overlay);
+                    backdrop-filter: blur(20px);
+                    border: 1px solid var(--border-color);
+                    border-radius: var(--radius-medium);
+                    padding: 30px;
+                    max-width: 500px;
+                    width: 90%;
+                    color: var(--text-primary);
+                    box-shadow: var(--shadow-heavy);
+                `;
+                
+                modalContent.innerHTML = `
+                    <h3 style="margin: 0 0 20px 0; color: var(--text-primary); text-align: center;">
+                        <i class="fas fa-keyboard" style="color: var(--accent-color); margin-right: 10px;"></i>
+                        Keyboard Shortcuts
+                    </h3>
+                    <div style="display: grid; gap: 12px; font-size: 14px;">
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);">
+                            <span>Start/Stop Recording</span>
+                            <span style="color: var(--accent-color); font-family: monospace;">Ctrl + Space</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);">
+                            <span>Swap Languages</span>
+                            <span style="color: var(--accent-color); font-family: monospace;">Ctrl + S</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);">
+                            <span>Toggle Theme</span>
+                            <span style="color: var(--accent-color); font-family: monospace;">Ctrl + T</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);">
+                            <span>Toggle History</span>
+                            <span style="color: var(--accent-color); font-family: monospace;">Ctrl + H</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);">
+                            <span>Stop Recording</span>
+                            <span style="color: var(--accent-color); font-family: monospace;">Esc</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                            <span>Show Shortcuts</span>
+                            <span style="color: var(--accent-color); font-family: monospace;">Ctrl + ?</span>
+                        </div>
+                    </div>
+                    <button id="closeShortcuts" style="
+                        width: 100%;
+                        margin-top: 20px;
+                        padding: 10px;
+                        background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%);
+                        color: var(--text-primary);
+                        border: none;
+                        border-radius: var(--radius-small);
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: 500;
+                    ">Close</button>
+                `;
+                
+                modal.appendChild(modalContent);
+                document.body.appendChild(modal);
+                
+                // Close modal functionality
+                document.getElementById('closeShortcuts').addEventListener('click', () => {
+                    modal.remove();
+                });
+                
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.remove();
+                    }
+                });
+            }
+            
+            // Add keyboard shortcut for showing shortcuts (Ctrl + ?)
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === '/') {
+                    e.preventDefault();
+                    showShortcutsModal();
+                }
+            });
         });
     </script>
 </body>

@@ -35,6 +35,7 @@ window.speechTranslatorApp = {
     this.setupEventListeners();
     await this.testGoogleCloudConnection();
     this.initializeSocketIO(); // Initialize Socket.IO like web app
+    this.updateHistoryDisplay(); // Initialize history display
   },
   
   // Initialize Socket.IO connection (from web app)
@@ -587,6 +588,12 @@ window.speechTranslatorApp = {
     const transcriptClass = isFinal ? 'final' : 'interim';
     
     if (isFinal) {
+      // Save to history if enabled
+      const saveHistoryEnabled = localStorage.getItem('saveHistory') !== 'false';
+      if (saveHistoryEnabled) {
+        this.saveToHistory(transcript, timestamp);
+      }
+      
       // Add to existing transcripts
       const finalDiv = document.createElement('div');
       finalDiv.className = `transcript-item ${transcriptClass}`;
@@ -616,6 +623,136 @@ window.speechTranslatorApp = {
           <span>Transcribed Text:</span>
         </div>
       `;
+    }
+  },
+  
+  // Save transcript to history
+  saveToHistory(transcript, timestamp) {
+    try {
+      let history = JSON.parse(localStorage.getItem('transcriptHistory') || '[]');
+      
+      const historyItem = {
+        id: Date.now(),
+        text: transcript,
+        timestamp: timestamp,
+        date: new Date().toLocaleDateString(),
+        sourceLanguage: this.currentLanguagePair.source,
+        targetLanguage: this.currentLanguagePair.target
+      };
+      
+      history.unshift(historyItem); // Add to beginning
+      
+      // Limit history to 100 items
+      if (history.length > 100) {
+        history = history.slice(0, 100);
+      }
+      
+      localStorage.setItem('transcriptHistory', JSON.stringify(history));
+      this.updateHistoryDisplay();
+      
+      console.log('Saved to history:', historyItem);
+    } catch (error) {
+      console.error('Error saving to history:', error);
+    }
+  },
+  
+  // Update history display
+  updateHistoryDisplay() {
+    const historyList = document.getElementById('historyList');
+    if (!historyList) return;
+    
+    try {
+      const history = JSON.parse(localStorage.getItem('transcriptHistory') || '[]');
+      
+      if (history.length === 0) {
+        historyList.innerHTML = `
+          <p style="font-size: 12px; color: var(--text-muted); text-align: center; margin: 20px 0;">
+            No history items yet. Start recording to see your transcription history here.
+          </p>`;
+        return;
+      }
+      
+      let historyHTML = '';
+      history.slice(0, 10).forEach(item => { // Show only last 10 items
+        historyHTML += `
+          <div class="history-item" style="
+            background: var(--background-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-small);
+            padding: 10px;
+            margin-bottom: 8px;
+            font-size: 12px;
+          ">
+            <div style="color: var(--text-primary); margin-bottom: 5px; line-height: 1.4;">
+              ${item.text.length > 100 ? item.text.substring(0, 100) + '...' : item.text}
+            </div>
+            <div style="color: var(--text-muted); font-size: 10px;">
+              ${item.date} ${item.timestamp} | ${item.sourceLanguage} → ${item.targetLanguage}
+            </div>
+            <button onclick="speechTranslatorApp.copyHistoryItem('${item.text}')" 
+                    class="copy-button" style="font-size: 10px; padding: 4px 8px; margin-top: 5px;">
+              <i class="fas fa-copy"></i> Copy
+            </button>
+          </div>`;
+      });
+      
+      historyList.innerHTML = historyHTML;
+    } catch (error) {
+      console.error('Error updating history display:', error);
+    }
+  },
+  
+  // Copy history item to clipboard
+  copyHistoryItem(text) {
+    navigator.clipboard.writeText(text).then(() => {
+      console.log('Copied to clipboard:', text);
+    }).catch(err => {
+      console.error('Failed to copy to clipboard:', err);
+    });
+  },
+  
+  // Clear history
+  clearHistory() {
+    localStorage.removeItem('transcriptHistory');
+    this.updateHistoryDisplay();
+    console.log('History cleared');
+  },
+  
+  // Export history to file
+  exportHistory() {
+    try {
+      const history = JSON.parse(localStorage.getItem('transcriptHistory') || '[]');
+      
+      if (history.length === 0) {
+        alert('No history to export.');
+        return;
+      }
+      
+      let exportContent = 'Transcription History Export\n';
+      exportContent += '=' + '='.repeat(30) + '\n\n';
+      
+      history.forEach((item, index) => {
+        exportContent += `${index + 1}. ${item.date} ${item.timestamp}\n`;
+        exportContent += `Language: ${item.sourceLanguage} → ${item.targetLanguage}\n`;
+        exportContent += `Text: ${item.text}\n`;
+        exportContent += '-'.repeat(50) + '\n\n';
+      });
+      
+      const blob = new Blob([exportContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transcription_history_${new Date().toISOString().split('T')[0]}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      URL.revokeObjectURL(url);
+      console.log('History exported successfully');
+    } catch (error) {
+      console.error('Error exporting history:', error);
+      alert('Failed to export history.');
     }
   },
   
@@ -666,6 +803,20 @@ window.speechTranslatorApp = {
   async translateText(text) {
     try {
       if (!text || text.trim() === '') {
+        return;
+      }
+      
+      // Check if auto-translate is enabled
+      const autoTranslateEnabled = localStorage.getItem('autoTranslate') !== 'false';
+      if (!autoTranslateEnabled) {
+        console.log('Auto-translate disabled, skipping translation');
+        const translationDiv = document.getElementById('translationDisplay');
+        if (translationDiv) {
+          translationDiv.innerHTML = `
+            <div style="color: var(--text-muted); font-style: italic; text-align: center;">
+              Auto-translate disabled. Enable in settings to see translations.
+            </div>`;
+        }
         return;
       }
       
