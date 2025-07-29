@@ -613,7 +613,7 @@ window.speechTranslatorApp = {
       interimDiv.innerHTML = `
         <div class="transcript-text">${transcript}</div>
         <div class="transcript-meta">
-          <span>Listening...</span>
+          <span>Transcribed Text:</span>
         </div>
       `;
     }
