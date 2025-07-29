@@ -23,6 +23,21 @@ window.speechTranslatorApp = {
   // Real-time streaming properties
   autoCommitTimer: null,
   autoCommitInterval: 5000, // 5 seconds
+  
+  // Performance tracking
+  performanceStats: {
+    apiCalls: 0,
+    successfulCalls: 0,
+    failedCalls: 0,
+    totalResponseTime: 0,
+    cacheHits: 0,
+    startTime: Date.now(),
+    memoryUsage: 0,
+    lastResponseTime: 0
+  },
+  
+  // Current transcript for history saving
+  currentTranscriptForHistory: null,
   lastCommitTime: 0,
   pendingInterimText: '',
   wordCompleteDelay: 1000,
@@ -36,6 +51,7 @@ window.speechTranslatorApp = {
     await this.testGoogleCloudConnection();
     this.initializeSocketIO(); // Initialize Socket.IO like web app
     this.updateHistoryDisplay(); // Initialize history display
+    this.initializePerformanceTracking(); // Initialize performance tracking
   },
   
   // Initialize Socket.IO connection (from web app)
@@ -491,21 +507,26 @@ window.speechTranslatorApp = {
       
       console.log('Combined audio data prepared, size:', audioArray.length, 'bytes');
       
-      // Send to Google Cloud Speech-to-Text
-      const transcriptionResult = await window.electronAPI.transcribeAudio(
-        audioArray, 
-        this.currentLanguagePair.source
-      );
-      
-      if (transcriptionResult.transcript && transcriptionResult.transcript.trim()) {
-        console.log('Accumulated chunk transcription received:', transcriptionResult.transcript);
+      // Send to Google Cloud Speech-to-Text with performance tracking
+      const startTime = performance.now();
+      try {
+        const transcriptionResult = await window.electronAPI.transcribeAudio(
+          audioArray, 
+          this.currentLanguagePair.source
+        );
         
-        // Add to final transcript (avoid duplicates)
-        const newText = transcriptionResult.transcript.trim();
-        if (!this.finalTranscript.includes(newText)) {
-          this.finalTranscript += newText + ' ';
-        }
-        this.currentTranscript = ''; // Clear interim
+        const responseTime = Math.round(performance.now() - startTime);
+        this.trackApiCall('Speech-to-Text', responseTime, true);
+        
+        if (transcriptionResult.transcript && transcriptionResult.transcript.trim()) {
+          console.log('Accumulated chunk transcription received:', transcriptionResult.transcript);
+          
+          // Add to final transcript (avoid duplicates)
+          const newText = transcriptionResult.transcript.trim();
+          if (!this.finalTranscript.includes(newText)) {
+            this.finalTranscript += newText + ' ';
+          }
+          this.currentTranscript = ''; // Clear interim
         
         // Update display immediately
         this.updateStreamingTranscript();
@@ -517,6 +538,13 @@ window.speechTranslatorApp = {
         console.log('No speech detected in accumulated chunks');
         this.currentTranscript = ''; // Clear processing message
         this.updateStreamingTranscript();
+      }
+      
+      } catch (error) {
+        const responseTime = Math.round(performance.now() - startTime);
+        this.trackApiCall('Speech-to-Text', responseTime, false);
+        console.error('Transcription API error:', error);
+        throw error;
       }
       
       // Clear processed chunks but keep the last one for continuity
@@ -588,10 +616,13 @@ window.speechTranslatorApp = {
     const transcriptClass = isFinal ? 'final' : 'interim';
     
     if (isFinal) {
-      // Save to history if enabled
+      // Store transcript for history saving (will be saved with translation)
       const saveHistoryEnabled = localStorage.getItem('saveHistory') !== 'false';
       if (saveHistoryEnabled) {
-        this.saveToHistory(transcript, timestamp);
+        this.currentTranscriptForHistory = {
+          text: transcript,
+          timestamp: timestamp
+        };
       }
       
       // Add to existing transcripts
@@ -627,13 +658,14 @@ window.speechTranslatorApp = {
   },
   
   // Save transcript to history
-  saveToHistory(transcript, timestamp) {
+  saveToHistory(transcript, timestamp, translation = null) {
     try {
       let history = JSON.parse(localStorage.getItem('transcriptHistory') || '[]');
       
       const historyItem = {
         id: Date.now(),
         text: transcript,
+        translation: translation,
         timestamp: timestamp,
         date: new Date().toLocaleDateString(),
         sourceLanguage: this.currentLanguagePair.source,
@@ -674,6 +706,11 @@ window.speechTranslatorApp = {
       
       let historyHTML = '';
       history.slice(0, 10).forEach(item => { // Show only last 10 items
+        const displayText = item.text.length > 80 ? item.text.substring(0, 80) + '...' : item.text;
+        const displayTranslation = item.translation ? 
+          (item.translation.length > 80 ? item.translation.substring(0, 80) + '...' : item.translation) : 
+          'No translation';
+        
         historyHTML += `
           <div class="history-item" style="
             background: var(--background-secondary);
@@ -683,16 +720,29 @@ window.speechTranslatorApp = {
             margin-bottom: 8px;
             font-size: 12px;
           ">
-            <div style="color: var(--text-primary); margin-bottom: 5px; line-height: 1.4;">
-              ${item.text.length > 100 ? item.text.substring(0, 100) + '...' : item.text}
+            <div style="color: var(--text-primary); margin-bottom: 8px; line-height: 1.4;">
+              <div style="font-weight: 500; margin-bottom: 4px;">📝 Original:</div>
+              <div style="margin-bottom: 6px;">${displayText}</div>
+              ${item.translation ? `
+                <div style="font-weight: 500; margin-bottom: 4px; color: var(--accent-color);">🌐 Translation:</div>
+                <div style="color: var(--text-secondary);">${displayTranslation}</div>
+              ` : ''}
             </div>
-            <div style="color: var(--text-muted); font-size: 10px;">
+            <div style="color: var(--text-muted); font-size: 10px; margin-bottom: 8px;">
               ${item.date} ${item.timestamp} | ${item.sourceLanguage} → ${item.targetLanguage}
             </div>
-            <button onclick="speechTranslatorApp.copyHistoryItem('${item.text}')" 
-                    class="copy-button" style="font-size: 10px; padding: 4px 8px; margin-top: 5px;">
-              <i class="fas fa-copy"></i> Copy
-            </button>
+            <div style="display: flex; gap: 6px;">
+              <button onclick="speechTranslatorApp.copyHistoryItem('${item.text.replace(/'/g, "\\'")}')" 
+                      class="copy-button" style="font-size: 10px; padding: 4px 8px;">
+                <i class="fas fa-copy"></i> Copy Original
+              </button>
+              ${item.translation ? `
+                <button onclick="speechTranslatorApp.copyHistoryItem('${item.translation.replace(/'/g, "\\'")}')" 
+                        class="copy-button" style="font-size: 10px; padding: 4px 8px;">
+                  <i class="fas fa-language"></i> Copy Translation
+                </button>
+              ` : ''}
+            </div>
           </div>`;
       });
       
@@ -728,14 +778,19 @@ window.speechTranslatorApp = {
         return;
       }
       
-      let exportContent = 'Transcription History Export\n';
-      exportContent += '=' + '='.repeat(30) + '\n\n';
+      let exportContent = 'Transcription & Translation History Export\n';
+      exportContent += '=' + '='.repeat(40) + '\n\n';
       
       history.forEach((item, index) => {
         exportContent += `${index + 1}. ${item.date} ${item.timestamp}\n`;
         exportContent += `Language: ${item.sourceLanguage} → ${item.targetLanguage}\n`;
-        exportContent += `Text: ${item.text}\n`;
-        exportContent += '-'.repeat(50) + '\n\n';
+        exportContent += `Original Text: ${item.text}\n`;
+        if (item.translation) {
+          exportContent += `Translation: ${item.translation}\n`;
+        } else {
+          exportContent += `Translation: [Not available]\n`;
+        }
+        exportContent += '-'.repeat(60) + '\n\n';
       });
       
       const blob = new Blob([exportContent], { type: 'text/plain' });
@@ -754,6 +809,85 @@ window.speechTranslatorApp = {
       console.error('Error exporting history:', error);
       alert('Failed to export history.');
     }
+  },
+  
+  // Performance tracking methods
+  trackApiCall(type, responseTime, success = true) {
+    this.performanceStats.apiCalls++;
+    this.performanceStats.lastResponseTime = responseTime;
+    this.performanceStats.totalResponseTime += responseTime;
+    
+    if (success) {
+      this.performanceStats.successfulCalls++;
+    } else {
+      this.performanceStats.failedCalls++;
+    }
+    
+    console.log(`API Call tracked: ${type}, ${responseTime}ms, Success: ${success}`);
+    this.updatePerformanceDisplay();
+  },
+  
+  // Update memory usage
+  updateMemoryUsage() {
+    if (performance.memory) {
+      this.performanceStats.memoryUsage = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024); // MB
+    }
+    this.updatePerformanceDisplay();
+  },
+  
+  // Track cache hit
+  trackCacheHit() {
+    this.performanceStats.cacheHits++;
+    this.updatePerformanceDisplay();
+  },
+  
+  // Update performance display
+  updatePerformanceDisplay() {
+    const cacheStats = document.getElementById('cacheStats');
+    const apiStats = document.getElementById('apiStats');
+    
+    if (!cacheStats || !apiStats) return;
+    
+    const stats = this.performanceStats;
+    const successRate = stats.apiCalls > 0 ? Math.round((stats.successfulCalls / stats.apiCalls) * 100) : 100;
+    const avgResponseTime = stats.apiCalls > 0 ? Math.round(stats.totalResponseTime / stats.apiCalls) : 0;
+    const uptime = Math.round((Date.now() - stats.startTime) / 1000);
+    
+    // Memory usage status
+    let memoryStatus = 'Low';
+    if (stats.memoryUsage > 100) memoryStatus = 'High';
+    else if (stats.memoryUsage > 50) memoryStatus = 'Medium';
+    
+    // Cache efficiency
+    const cacheEfficiency = stats.apiCalls > 0 ? Math.round((stats.cacheHits / stats.apiCalls) * 100) : 0;
+    
+    cacheStats.innerHTML = `
+      <p style="font-size: 12px; color: var(--text-muted); margin: 5px 0;">Cache Hits: ${stats.cacheHits}</p>
+      <p style="font-size: 12px; color: var(--text-muted); margin: 5px 0;">API Calls: ${stats.apiCalls}</p>
+      <p style="font-size: 12px; color: var(--text-muted); margin: 5px 0;">Memory: ${stats.memoryUsage}MB (${memoryStatus})</p>
+    `;
+    
+    apiStats.innerHTML = `
+      <p style="font-size: 12px; color: var(--text-muted); margin: 5px 0;">Response Time: ${stats.lastResponseTime}ms (Avg: ${avgResponseTime}ms)</p>
+      <p style="font-size: 12px; color: var(--text-muted); margin: 5px 0;">Success Rate: ${successRate}%</p>
+      <p style="font-size: 12px; color: var(--text-muted); margin: 5px 0;">Errors: ${stats.failedCalls} | Uptime: ${uptime}s</p>
+    `;
+  },
+  
+  // Initialize performance tracking
+  initializePerformanceTracking() {
+    // Update performance display initially
+    this.updatePerformanceDisplay();
+    
+    // Update memory usage and performance display every 5 seconds
+    setInterval(() => {
+      this.updateMemoryUsage();
+    }, 5000);
+    
+    // Reset performance stats start time
+    this.performanceStats.startTime = Date.now();
+    
+    console.log('Performance tracking initialized');
   },
   
   // Fallback batch processing for when streaming fails
@@ -777,20 +911,32 @@ window.speechTranslatorApp = {
       
       console.log('Audio data prepared, size:', audioArray.length, 'bytes');
       
-      // Send to Google Cloud Speech-to-Text
-      const transcriptionResult = await window.electronAPI.transcribeAudio(
-        audioArray, 
-        this.currentLanguagePair.source
-      );
-      
-      if (transcriptionResult && transcriptionResult.text) {
-        console.log('Batch transcription result:', transcriptionResult.text);
-        this.displayTranscript(transcriptionResult.text, true);
-        await this.translateText(transcriptionResult.text);
-        this.updateStatus('Transcription complete');
-      } else {
-        console.log('No transcription result from batch processing');
-        this.updateStatus('No speech detected');
+      // Send to Google Cloud Speech-to-Text with performance tracking
+      const startTime = performance.now();
+      try {
+        const transcriptionResult = await window.electronAPI.transcribeAudio(
+          audioArray, 
+          this.currentLanguagePair.source
+        );
+        
+        const responseTime = Math.round(performance.now() - startTime);
+        this.trackApiCall('Speech-to-Text', responseTime, true);
+        
+        if (transcriptionResult && transcriptionResult.text) {
+          console.log('Batch transcription result:', transcriptionResult.text);
+          this.displayTranscript(transcriptionResult.text, true);
+          await this.translateText(transcriptionResult.text);
+          this.updateStatus('Transcription complete');
+        } else {
+          console.log('No transcription result from batch processing');
+          this.updateStatus('No speech detected');
+        }
+        
+      } catch (apiError) {
+        const responseTime = Math.round(performance.now() - startTime);
+        this.trackApiCall('Speech-to-Text', responseTime, false);
+        console.error('Transcription API error:', apiError);
+        this.updateStatus('Transcription failed');
       }
       
     } catch (error) {
@@ -810,6 +956,17 @@ window.speechTranslatorApp = {
       const autoTranslateEnabled = localStorage.getItem('autoTranslate') !== 'false';
       if (!autoTranslateEnabled) {
         console.log('Auto-translate disabled, skipping translation');
+        
+        // Save to history without translation if we have a pending transcript
+        if (this.currentTranscriptForHistory) {
+          this.saveToHistory(
+            this.currentTranscriptForHistory.text,
+            this.currentTranscriptForHistory.timestamp,
+            null // No translation
+          );
+          this.currentTranscriptForHistory = null; // Clear after saving
+        }
+        
         const translationDiv = document.getElementById('translationDisplay');
         if (translationDiv) {
           translationDiv.innerHTML = `
@@ -833,13 +990,28 @@ window.speechTranslatorApp = {
       // Convert speech language code to translation language code
       const sourceLanguageCode = this.speechToTranslationLangCode(this.currentLanguagePair.source);
       
-      const translationResult = await window.electronAPI.translateText(
-        text,
-        this.currentLanguagePair.target,
-        sourceLanguageCode
-      );
-      
-      console.log('Translation received:', translationResult);
+      const startTime = performance.now();
+      try {
+        const translationResult = await window.electronAPI.translateText(
+          text,
+          this.currentLanguagePair.target,
+          sourceLanguageCode
+        );
+        
+        const responseTime = Math.round(performance.now() - startTime);
+        this.trackApiCall('Translation', responseTime, true);
+        
+        console.log('Translation received:', translationResult);
+        
+        // Save to history with both transcript and translation
+        if (this.currentTranscriptForHistory) {
+          this.saveToHistory(
+            this.currentTranscriptForHistory.text,
+            this.currentTranscriptForHistory.timestamp,
+            translationResult.translatedText
+          );
+          this.currentTranscriptForHistory = null; // Clear after saving
+        }
       
       // Update translation display
       if (translationDiv) {
@@ -859,8 +1031,26 @@ window.speechTranslatorApp = {
           </div>`;
       }
       
+      } catch (apiError) {
+        const responseTime = Math.round(performance.now() - startTime);
+        this.trackApiCall('Translation', responseTime, false);
+        console.error('Translation API error:', apiError);
+        throw apiError;
+      }
+      
     } catch (error) {
       console.error('Translation error:', error);
+      
+      // Save to history without translation if we have a pending transcript and translation failed
+      if (this.currentTranscriptForHistory) {
+        this.saveToHistory(
+          this.currentTranscriptForHistory.text,
+          this.currentTranscriptForHistory.timestamp,
+          null // No translation due to error
+        );
+        this.currentTranscriptForHistory = null; // Clear after saving
+      }
+      
       const translationDiv = document.getElementById('translationDisplay');
       if (translationDiv) {
         translationDiv.innerHTML = `
@@ -932,26 +1122,84 @@ window.speechTranslatorApp = {
     const targetSelect = document.getElementById('targetLanguage');
     
     if (sourceSelect && targetSelect) {
-      const tempSource = this.currentLanguagePair.source;
-      const tempTarget = this.currentLanguagePair.target;
+      // Get current values
+      const currentSource = sourceSelect.value;
+      const currentTarget = targetSelect.value;
       
-      // Convert target language to source language format if needed
-      const newSource = tempTarget.includes('-') ? tempTarget : tempTarget + '-US';
-      const newTarget = this.speechToTranslationLangCode(tempSource);
+      // Get all available options
+      const sourceOptions = Array.from(sourceSelect.options);
+      const targetOptions = Array.from(targetSelect.options);
       
-      // Update selections if the languages exist in the dropdowns
-      const sourceOptions = Array.from(sourceSelect.options).map(opt => opt.value);
-      const targetOptions = Array.from(targetSelect.options).map(opt => opt.value);
+      // Find the corresponding language names
+      const sourceLanguageName = sourceOptions.find(opt => opt.value === currentSource)?.textContent;
+      const targetLanguageName = targetOptions.find(opt => opt.value === currentTarget)?.textContent;
       
-      if (sourceOptions.includes(newSource) && targetOptions.includes(newTarget)) {
-        this.currentLanguagePair.source = newSource;
-        this.currentLanguagePair.target = newTarget;
-        sourceSelect.value = newSource;
-        targetSelect.value = newTarget;
-        console.log('Languages swapped:', this.currentLanguagePair);
+      // Try to find matching languages in opposite selectors
+      // For source: look for target language in source options
+      let newSourceValue = null;
+      let newTargetValue = null;
+      
+      // Simple approach: try to find by language name or partial matching
+      // Check if current target exists in source options
+      const targetInSource = sourceOptions.find(opt => 
+        opt.value === currentTarget || 
+        opt.value.startsWith(currentTarget) || 
+        opt.textContent.toLowerCase().includes(targetLanguageName?.toLowerCase().split(' ')[0] || '')
+      );
+      
+      // Check if current source exists in target options  
+      const sourceInTarget = targetOptions.find(opt => 
+        opt.value === this.speechToTranslationLangCode(currentSource) ||
+        opt.textContent.toLowerCase().includes(sourceLanguageName?.toLowerCase().split(' ')[0] || '')
+      );
+      
+      if (targetInSource && sourceInTarget) {
+        newSourceValue = targetInSource.value;
+        newTargetValue = sourceInTarget.value;
       } else {
-        console.warn('Cannot swap languages - not all combinations available');
+        // Fallback: try basic language code conversion
+        const sourceBasicCode = this.speechToTranslationLangCode(currentSource);
+        const targetWithRegion = currentTarget + '-US'; // Add region for speech recognition
+        
+        const sourceHasTarget = sourceOptions.some(opt => 
+          opt.value === targetWithRegion || opt.value === currentTarget
+        );
+        const targetHasSource = targetOptions.some(opt => 
+          opt.value === sourceBasicCode
+        );
+        
+        if (sourceHasTarget && targetHasSource) {
+          newSourceValue = sourceOptions.find(opt => 
+            opt.value === targetWithRegion || opt.value === currentTarget
+          ).value;
+          newTargetValue = sourceBasicCode;
+        }
       }
+      
+      // Apply the swap if valid combinations found
+      if (newSourceValue && newTargetValue) {
+        this.currentLanguagePair.source = newSourceValue;
+        this.currentLanguagePair.target = newTargetValue;
+        sourceSelect.value = newSourceValue;
+        targetSelect.value = newTargetValue;
+        
+        console.log('Languages swapped successfully:', {
+          from: { source: currentSource, target: currentTarget },
+          to: { source: newSourceValue, target: newTargetValue }
+        });
+        
+        // Update status to show the swap
+        this.updateStatus(`Languages swapped: ${sourceSelect.options[sourceSelect.selectedIndex].text} ↔ ${targetSelect.options[targetSelect.selectedIndex].text}`);
+      } else {
+        console.warn('Cannot swap languages - compatible language pair not found');
+        this.updateStatus('Cannot swap - languages not compatible');
+        
+        // Show available options for debugging
+        console.log('Available source languages:', sourceOptions.map(opt => ({code: opt.value, name: opt.textContent})));
+        console.log('Available target languages:', targetOptions.map(opt => ({code: opt.value, name: opt.textContent})));
+      }
+    } else {
+      console.error('Language selectors not found');
     }
   },
   
