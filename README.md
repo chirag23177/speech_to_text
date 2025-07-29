@@ -278,4 +278,4 @@ For issues and questions:
 
 ---
 
-Made with ❤️ by [Chirag](https://github.com/chirag23177)
+Made by [Chirag](https://github.com/chirag23177)
