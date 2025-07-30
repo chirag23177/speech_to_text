@@ -121,7 +121,30 @@ window.speechTranslatorApp = {
     
     this.socket.on('streaming-error', (error) => {
       console.error('Streaming error:', error);
-      this.updateStatus('Streaming error: ' + error.message);
+      
+      // Handle different types of streaming errors
+      if (error.message && error.message.includes('auto-restarting')) {
+        // Auto-restart in progress, show temporary status
+        this.updateStatus('Stream restarting due to silence...');
+        setTimeout(() => {
+          if (this.isRecording) {
+            this.updateStatus('Recording...');
+          }
+        }, 2000);
+      } else if (error.message && error.message.includes('cancelled due to silence')) {
+        // Stream was cancelled but is being auto-restarted
+        this.updateStatus('Stream reconnecting...');
+      } else {
+        // Other errors
+        this.updateStatus('Streaming error: ' + error.message);
+        
+        // If it's a critical error, show user-friendly message
+        if (error.code === 3) {
+          this.updateTranscript('Audio format error. Please check your microphone settings and try again.');
+        } else if (error.code === 11) {
+          this.updateTranscript('Audio processing failed. Please speak more clearly or check your internet connection.');
+        }
+      }
     });
     
     this.socket.on('stream-started', () => {
@@ -131,7 +154,12 @@ window.speechTranslatorApp = {
     
     this.socket.on('stream-ended', () => {
       console.log('Stream ended');
-      this.updateStatus('Stream ended');
+      if (this.isRecording) {
+        // If we're still supposed to be recording, this might be an unexpected end
+        this.updateStatus('Stream reconnecting...');
+      } else {
+        this.updateStatus('Stream ended');
+      }
     });
     
     this.socket.on('connect_error', (error) => {
@@ -448,8 +476,15 @@ window.speechTranslatorApp = {
     });
     
     // Set up MediaRecorder for real-time streaming
+    const mimeType = 'audio/webm;codecs=opus';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      console.warn('WebM Opus not supported, trying alternatives...');
+      throw new Error('WebM Opus codec not supported by this browser');
+    }
+    
     this.mediaRecorder = new MediaRecorder(stream, {
-      mimeType: 'audio/webm;codecs=opus'
+      mimeType: mimeType,
+      audioBitsPerSecond: 16000 // Lower bitrate for better streaming
     });
     
     this.mediaRecorder.ondataavailable = (event) => {

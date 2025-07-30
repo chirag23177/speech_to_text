@@ -7,23 +7,33 @@ A powerful Electron-based desktop application that provides real-time speech-to-
 ### Core Functionality
 - **Real-Time Speech Recognition** - Live transcription as you speak
 - **Multi-Language Translation** - Instant translation to 100+ languages
-- **Socket.IO Streaming** - Low-latency real-time audio processing
+- **Socket.IO Streaming** - Low-latency real-time audio processing with fallback support
 - **Interim Results** - See words appear as you speak them
 - **Auto-Commit** - Automatically finalizes transcripts after speech pauses
 - **Voice Activity Detection** - Visual feedback when speech is detected
 
+### Enhanced Features 
+- **Performance Monitoring** - Real-time API response tracking and memory usage
+- **History Management** - Save and export transcripts with translations
+- **Smart Language Swapping** - Intelligent language pair switching
+- **Dual-Text History** - Store both original transcription and translation
+- **Export Functionality** - Export complete conversation history to text files
+- **Error Recovery** - Robust fallback mechanisms for reliable operation
+
 ### Audio Processing
 - **High-Quality Audio** - 16kHz sample rate with noise suppression
-- **Echo Cancellation** - Optimized for online meetings
+- **Echo Cancellation** - Optimized for clear voice capture
 - **Audio Visualization** - Real-time audio level indicators
-- **Format Support** - WebM/Opus encoding for optimal quality
+- **Format Support** - FLAC encoding for optimal quality
+- **Simplified Audio Handling** - Reliable microphone input capture
 
 ### User Interface
-- **Modern Desktop UI** - Clean, professional interface
+- **Modern Desktop UI** - Clean, professional interface with responsive design
 - **Dark/Light Themes** - Customizable appearance
-- **Language Swapping** - Quick source/target language switching
+- **Language Swapping** - Quick source/target language switching with smart matching
 - **Keyboard Shortcuts** - Efficient workflow controls
 - **Copy/Export** - Easy sharing of transcripts and translations
+- **Performance Dashboard** - Live statistics and system monitoring
 
 ## 🛠️ Technology Stack
 
@@ -49,17 +59,21 @@ A powerful Electron-based desktop application that provides real-time speech-to-
 
 ```
 speech_to_text/
-├── main.js                 # Electron main process
-├── preload.js             # Secure IPC bridge
-├── index.html             # Desktop app UI
-├── app-google-cloud.js    # Frontend application logic
-├── styles.css             # Application styling
-├── server.js              # Socket.IO streaming server
-├── google-cloud-service.js # Google Cloud API integration
-├── credentials.json       # Google Cloud service account key
-├── package.json           # Dependencies and scripts
-├── plan.md               # Development roadmap
-└── README.md             # This file
+├── main.js                    # Electron main process
+├── preload.js                # Secure IPC bridge
+├── index.html                # Desktop app UI
+├── app-google-cloud.js       # Frontend application logic
+├── styles.css                # Application styling
+├── server.js                 # Socket.IO streaming server
+├── google-cloud-service.js   # Google Cloud API integration
+├── credentials.json          # Google Cloud service account key
+├── package.json              # Dependencies and scripts
+├── start.bat                 # Windows startup script
+├── plan.md                   # Development roadmap
+├── README.md                 # This file
+├── LICENSE                   # MIT License
+└── .vscode/
+    └── tasks.json            # VS Code development tasks
 ```
 
 ## 🔧 Setup Instructions
@@ -137,12 +151,24 @@ npm start
 - `Ctrl+S` - Swap source/target languages
 - `Escape` - Stop recording
 
+### Performance Features
+- **Live Statistics** - Real-time API call monitoring and response times
+- **Memory Tracking** - Monitor application memory usage
+- **Success Rate Monitoring** - Track API call success/failure rates
+- **Error Handling** - Comprehensive error recovery with user feedback
+
+### History & Export
+- **Complete History** - Save both transcriptions and translations
+- **Export Options** - Export conversation history to text files
+- **Copy Functions** - Quick copy of original text or translations
+- **Persistent Storage** - Local storage of conversation history
+
 ### Tips for Best Results
 - **Speak Clearly** - Enunciate words properly
 - **Minimize Background Noise** - Use headphones if possible
 - **Good Microphone** - Quality audio input improves accuracy
 - **Stable Internet** - Required for Google Cloud APIs
-- **Language Selection** - Choose correct source language
+- **Language Selection** - Choose correct source language for optimal results
 
 ## 🔧 Development
 
@@ -164,10 +190,14 @@ npm test          # Run test suite
 - Security context isolation
 
 #### Frontend App (`app-google-cloud.js`)
-- Socket.IO client connection
+- Socket.IO client connection with fallback support
 - Audio capture and streaming
 - UI interaction handling
 - Real-time result processing
+- Performance monitoring and statistics
+- History management with dual-text storage
+- Smart language swapping with fallback logic
+- Error recovery and user feedback
 
 #### Streaming Server (`server.js`)
 - Socket.IO WebSocket server
@@ -223,14 +253,41 @@ DEBUG=speech-translator:* npm start
 - **250ms Audio Chunks** - Optimal balance of latency and quality
 - **Efficient Buffering** - Minimizes memory usage
 - **Connection Pooling** - Reuses Google Cloud connections
-- **Error Recovery** - Automatic retry mechanisms
+- **Error Recovery** - Automatic retry mechanisms with fallback support
 - **Resource Cleanup** - Proper disposal of audio streams
+- **Performance Tracking** - Real-time monitoring of API calls and system resources
+- **Intelligent Caching** - Smart caching of translation results
+- **Memory Management** - Optimized memory usage with periodic cleanup
 
 ### System Requirements
 - **RAM**: 4GB minimum, 8GB recommended
 - **CPU**: Dual-core 2.0GHz or better
 - **Internet**: Stable broadband connection
 - **Storage**: 500MB free space
+
+## 📋 Changelog
+
+### v1.2 (Current) - Enhanced Edition
+- ✅ **Performance Monitoring** - Real-time API call tracking and statistics
+- ✅ **Dual-Text History** - Save both transcriptions and translations
+- ✅ **Smart Language Swapping** - Intelligent language pair matching with fallbacks
+- ✅ **Export Functionality** - Export complete conversation history to text files
+- ✅ **Enhanced Copy Features** - Quick copy buttons for original and translated text
+- ✅ **Simplified Audio Handling** - More reliable microphone input capture
+- ✅ **Memory Usage Tracking** - Live memory monitoring and optimization
+- ✅ **Improved Error Handling** - Comprehensive error recovery and user feedback
+
+### v1.1 - Performance Edition  
+- ✅ **Live Statistics Dashboard** - Real-time performance monitoring
+- ✅ **API Response Tracking** - Monitor response times and success rates
+- ✅ **Memory Usage Indicators** - Track application memory consumption
+- ✅ **Enhanced Error Recovery** - Better handling of API failures
+
+### v1.0 - Initial Release
+- ✅ **Real-Time Speech Recognition** - Google Cloud Speech-to-Text integration
+- ✅ **Live Translation** - Multi-language translation support
+- ✅ **Socket.IO Streaming** - Low-latency audio processing
+- ✅ **Modern Desktop UI** - Professional Electron-based interface
 
 ## 🔒 Security & Privacy
 
@@ -246,11 +303,35 @@ DEBUG=speech-translator:* npm start
 - Rotate service account keys regularly
 - Use least-privilege access principles
 
+## 🚧 Recent Improvements (v1.2)
+
+### Performance Monitoring
+- **Real-time Statistics** - Live API call tracking, response times, and success rates
+- **Memory Usage Tracking** - Monitor application memory consumption
+- **Performance Dashboard** - Visual indicators for system health
+- **Error Tracking** - Comprehensive error logging and recovery
+
+### Enhanced History System
+- **Dual-Text Storage** - Save both original transcription and translation
+- **Export Functionality** - Export complete conversation history to text files
+- **Copy Options** - Quick copy buttons for both original and translated text
+- **Persistent Storage** - Local storage with history limit management (100 items)
+
+### Smart Language Features
+- **Intelligent Language Swapping** - Automatic language pair matching with fallbacks
+- **Cross-Language Compatibility** - Smart matching between speech and translation languages
+- **Language Code Conversion** - Automatic conversion between different language code formats
+
+### Simplified Audio Handling
+- **Reliable Microphone Input** - Simplified audio capture for better stability
+- **Enhanced Error Handling** - Specific error messages for different audio issues
+- **Improved Permissions** - Better handling of microphone access permissions
+
 ## 🚧 Known Limitations
 
-- **Windows Only** - Currently optimized for Windows platform
-- **Internet Required** - Requires active internet for Google Cloud APIs
-- **English Optimized** - Best performance with English speech input
+- **Windows Optimized** - Currently optimized for Windows platform
+- **Internet Required** - Requires active internet for Google Cloud APIs  
+- **Microphone Input Only** - Currently supports microphone input (system audio capture removed for stability)
 - **Single User** - Designed for individual use, not multi-user sessions
 
 ## 🛣️ Roadmap

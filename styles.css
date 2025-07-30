@@ -101,13 +101,15 @@ body {
     background: var(--background-overlay);
     border: 1px solid var(--border-color);
     border-radius: 50%;
-    width: 45px;
+    width: 70px;
     height: 45px;
     cursor: pointer;
     color: var(--text-primary);
     font-size: 1.2rem;
     transition: all var(--transition-normal);
     backdrop-filter: blur(10px);
+    top: 12px;
+    margin-top: -2px;
 }
 
 .theme-toggle:hover {
