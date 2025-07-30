@@ -15,12 +15,14 @@ let googleCloudService;
  */
 function createWindow() {
   // Create the browser window
+  const iconPath = path.join(__dirname, 'assets', 'icon.png');
+  
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    icon: path.join(__dirname, 'assets', 'icon.png'),
+    icon: fs.existsSync(iconPath) ? iconPath : undefined, // Only set icon if it exists
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -56,11 +58,32 @@ function createWindow() {
       return;
     }
     
+    console.log('Window minimize event triggered');
     event.preventDefault();
     mainWindow.hide();
+    console.log('Window hidden');
     
+    // Only create tray if it doesn't exist
     if (!tray) {
-      createTray();
+      console.log('Creating tray...');
+      try {
+        createTray();
+        if (!tray) {
+          // If tray creation failed, show window again
+          console.log('Tray creation failed, restoring window');
+          mainWindow.show();
+          return;
+        } else {
+          console.log('Tray created successfully');
+        }
+      } catch (error) {
+        console.error('Failed to create tray on minimize:', error);
+        // If tray creation fails, show window again
+        mainWindow.show();
+        return;
+      }
+    } else {
+      console.log('Using existing tray');
     }
   });
 
@@ -78,50 +101,148 @@ function createWindow() {
  * Create system tray
  */
 function createTray() {
-  const iconPath = path.join(__dirname, 'assets', 'icon.png');
+  const { nativeImage } = require('electron');
   
-  // Check if icon exists, if not use a default
-  if (!fs.existsSync(iconPath)) {
-    console.log('Tray icon not found, creating placeholder');
+  try {
+    let trayIcon;
+    const iconPath = path.join(__dirname, 'assets', 'icon.png');
+    
+    // Check if icon exists and is valid
+    if (fs.existsSync(iconPath)) {
+      console.log('Loading tray icon from:', iconPath);
+      trayIcon = nativeImage.createFromPath(iconPath);
+      
+      if (trayIcon.isEmpty()) {
+        console.log('Loaded icon is empty, creating fallback');
+        trayIcon = createFallbackIcon();
+      }
+    } else {
+      console.log('Tray icon not found, creating fallback icon');
+      trayIcon = createFallbackIcon();
+    }
+    
+    console.log('Creating tray with icon size:', trayIcon.getSize());
+    tray = new Tray(trayIcon);
+    
+    if (tray) {
+      console.log('✅ Tray created successfully');
+    } else {
+      console.log('❌ Tray creation failed');
+      return;
+    }
+  } catch (error) {
+    console.error('Failed to create tray:', error);
+    return; // Don't create tray if it fails
   }
-  
-  tray = new Tray(iconPath);
+
+  function createFallbackIcon() {
+    // Create a simple colored square as fallback
+    const size = 16;
+    const canvas = require('child_process').spawn ? null : null; // Check if we can use canvas
+    
+    // Create a simple icon using nativeImage
+    const fallbackIcon = nativeImage.createEmpty();
+    
+    // Try to create from buffer if possible
+    try {
+      // Simple 16x16 PNG with blue background (minimal valid PNG)
+      const pngData = Buffer.from([
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR
+        0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x10, // 16x16
+        0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x91, 0x68, 0x36, // 8-bit RGB
+        0x00, 0x00, 0x00, 0x3F, 0x49, 0x44, 0x41, 0x54, // IDAT
+        0x28, 0x15, 0x63, 0x60, 0x18, 0x05, 0xA3, 0x60,
+        0x14, 0x8C, 0x82, 0x51, 0x30, 0x0A, 0x46, 0xC1,
+        0x28, 0x18, 0x05, 0xA3, 0x60, 0x14, 0x8C, 0x82,
+        0x51, 0x30, 0x0A, 0x46, 0xC1, 0x28, 0x18, 0x05,
+        0xA3, 0x60, 0x14, 0x8C, 0x82, 0x51, 0x30, 0x0A,
+        0x46, 0xC1, 0x28, 0x18, 0x05, 0xA3, 0x60, 0x14,
+        0x8C, 0x82, 0x51, 0x30, 0x0A, 0x46, 0xC1, 0x00,
+        0x00, 0x0A, 0x75, 0x01, 0x34, 0x2C, 0x9D, 0x14, 0x5E,
+        0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, // IEND
+        0xAE, 0x42, 0x60, 0x82
+      ]);
+      
+      return nativeImage.createFromBuffer(pngData);
+    } catch (e) {
+      console.log('Failed to create PNG fallback, using empty icon');
+      fallbackIcon.resize({ width: 16, height: 16 });
+      return fallbackIcon;
+    }
+  }
   
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Show App',
+      label: '📱 Show Speech Translator',
       click: () => {
+        console.log('Restoring window from tray');
         mainWindow.show();
+        mainWindow.focus();
         if (process.platform === 'darwin') {
           app.dock.show();
         }
       }
     },
     {
-      label: 'Start Recording',
+      type: 'separator'
+    },
+    {
+      label: '🎤 Start Recording',
       click: () => {
+        mainWindow.show();
+        mainWindow.focus();
         mainWindow.webContents.send('toggle-recording');
+      }
+    },
+    {
+      label: '🔄 Swap Languages',
+      click: () => {
+        mainWindow.show();
+        mainWindow.focus();
+        mainWindow.webContents.send('swap-languages');
       }
     },
     {
       type: 'separator'
     },
     {
-      label: 'Quit',
+      label: '❌ Quit Application',
       click: () => {
+        console.log('Quitting from tray');
         app.isQuiting = true;
         app.quit();
       }
     }
   ]);
   
-  tray.setToolTip('Real-Time Speech Translator');
+  tray.setToolTip('Real-Time Speech Translator - Click to open');
   tray.setContextMenu(contextMenu);
   
-  // Double click to show window
-  tray.on('double-click', () => {
+  // Single click to show window (more intuitive)
+  tray.on('click', () => {
+    console.log('Tray clicked - showing window');
     mainWindow.show();
+    mainWindow.focus();
   });
+  
+  // Double click to show window (backup)
+  tray.on('double-click', () => {
+    console.log('Tray double-clicked - showing window');
+    mainWindow.show();
+    mainWindow.focus();
+  });
+  
+  // Show notification when minimized to tray
+  const { Notification } = require('electron');
+  if (Notification.isSupported()) {
+    const notification = new Notification({
+      title: 'Speech Translator',
+      body: 'App minimized to system tray. Click the tray icon to restore.',
+      silent: true
+    });
+    notification.show();
+  }
 }
 
 /**
@@ -377,11 +498,30 @@ function registerGlobalShortcuts() {
       if (mainWindow.isVisible()) {
         mainWindow.hide();
       } else {
+        console.log('Showing window via global shortcut');
         mainWindow.show();
         mainWindow.focus();
       }
     }
   });
+  
+  // Emergency restore shortcut (if tray doesn't work)
+  globalShortcut.register('CommandOrControl+Alt+S', () => {
+    if (mainWindow) {
+      console.log('Emergency restore - showing window');
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.setAlwaysOnTop(true);
+      setTimeout(() => {
+        mainWindow.setAlwaysOnTop(false);
+      }, 1000);
+    }
+  });
+  
+  console.log('Global shortcuts registered:');
+  console.log('  Ctrl+Shift+Space - Toggle recording');
+  console.log('  Ctrl+Shift+T - Show/hide app');
+  console.log('  Ctrl+Alt+S - Emergency restore window');
 }
 
 // App event listeners

@@ -1,80 +1,36 @@
-# Real-Time Speech Translator Desktop App
+# 🎤 Real-Time Speech Translator Desktop
 
-A powerful Electron-based desktop application that provides real-time speech-to-text transcription and translation using Google Cloud APIs. Perfect for online meetings, live conversations, and accessibility needs.
+A powerful, professional-grade Electron desktop application that provides real-time speech-to-text transcription and translation using Google Cloud AI. Perfect for meetings, conversations, accessibility, and language learning.
 
-## 🚀 Features
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)
 
-### Core Functionality
-- **Real-Time Speech Recognition** - Live transcription as you speak
-- **Multi-Language Translation** - Instant translation to 100+ languages
-- **Socket.IO Streaming** - Low-latency real-time audio processing with fallback support
-- **Interim Results** - See words appear as you speak them
-- **Auto-Commit** - Automatically finalizes transcripts after speech pauses
-- **Voice Activity Detection** - Visual feedback when speech is detected
+## ✨ Key Features
 
-### Enhanced Features 
-- **Performance Monitoring** - Real-time API response tracking and memory usage
-- **History Management** - Save and export transcripts with translations
-- **Smart Language Swapping** - Intelligent language pair switching
-- **Dual-Text History** - Store both original transcription and translation
-- **Export Functionality** - Export complete conversation history to text files
-- **Error Recovery** - Robust fallback mechanisms for reliable operation
+### 🎯 **Core Functionality**
+- **🎤 Real-Time Speech Recognition** - Live transcription with Google Cloud Speech-to-Text
+- **🌍 Multi-Language Translation** - Instant translation to 100+ languages 
+- **⚡ Socket.IO Streaming** - Low-latency audio processing with auto-restart capabilities
+- **🔄 Smart Language Swapping** - Intelligent language pair switching
+- **📊 Performance Monitoring** - Real-time API tracking and system metrics
+- **💾 History Management** - Save, search, and export complete conversation history
 
-### Audio Processing
-- **High-Quality Audio** - 16kHz sample rate with noise suppression
-- **Echo Cancellation** - Optimized for clear voice capture
-- **Audio Visualization** - Real-time audio level indicators
-- **Format Support** - FLAC encoding for optimal quality
-- **Simplified Audio Handling** - Reliable microphone input capture
+### 🎨 **User Experience**
+- **🖥️ Modern Desktop Interface** - Clean, responsive design with dark/light themes
+- **⌨️ Keyboard Shortcuts** - Efficient workflow controls and global hotkeys
+- **🔔 System Tray Integration** - Minimize to tray with quick access
+- **📱 Cross-Platform Ready** - Built on Electron for future multi-platform support
+- **🎛️ Audio Visualization** - Real-time audio level indicators
+- **⚠️ Error Recovery** - Robust fallback mechanisms for reliable operation
 
-### User Interface
-- **Modern Desktop UI** - Clean, professional interface with responsive design
-- **Dark/Light Themes** - Customizable appearance
-- **Language Swapping** - Quick source/target language switching with smart matching
-- **Keyboard Shortcuts** - Efficient workflow controls
-- **Copy/Export** - Easy sharing of transcripts and translations
-- **Performance Dashboard** - Live statistics and system monitoring
-
-## 🛠️ Technology Stack
-
-### Frontend
-- **Electron 28+** - Cross-platform desktop framework
-- **HTML5/CSS3** - Modern web technologies
-- **JavaScript ES6+** - Native browser APIs
-- **Socket.IO Client** - Real-time communication
-
-### Backend
-- **Node.js 20+** - Server runtime
-- **Express.js** - Web server framework
-- **Socket.IO Server** - WebSocket communication
-- **Google Cloud APIs** - AI-powered services
-
-### APIs & Services
-- **Google Cloud Speech-to-Text** - Advanced speech recognition
-- **Google Cloud Translate** - Professional translation service
-- **WebRTC** - Browser audio capture
-- **MediaRecorder API** - Audio streaming
-
-## 📁 Project Structure
-
-```
-speech_to_text/
-├── main.js                    # Electron main process
-├── preload.js                # Secure IPC bridge
-├── index.html                # Desktop app UI
-├── app-google-cloud.js       # Frontend application logic
-├── styles.css                # Application styling
-├── server.js                 # Socket.IO streaming server
-├── google-cloud-service.js   # Google Cloud API integration
-├── credentials.json          # Google Cloud service account key
-├── package.json              # Dependencies and scripts
-├── start.bat                 # Windows startup script
-├── plan.md                   # Development roadmap
-├── README.md                 # This file
-├── LICENSE                   # MIT License
-└── .vscode/
-    └── tasks.json            # VS Code development tasks
-```
+### 🔧 **Technical Excellence**
+- **🎵 High-Quality Audio** - 16kHz sampling with echo cancellation and noise suppression
+- **🔄 Auto-Restart Streaming** - Handles long pauses without losing connection
+- **💻 Performance Dashboard** - Live API response times and memory usage
+- **📤 Export Functionality** - Multiple export formats for conversations
+- **🛡️ Secure Design** - Context isolation and secure IPC communication
 
 ## 🔧 Setup Instructions
 
@@ -124,223 +80,114 @@ speech_to_text/
 
 ### 5. Run Application
 
-#### Start Socket.IO Server
+#### Through Terminal Manually
+##### Start Socket.IO Server
 ```bash
 # Terminal 1
 node server.js
 ```
 
-#### Start Desktop App
+##### Start Desktop App
 ```bash
 # Terminal 2
 npm start
 ```
 
-## 🎮 Usage Guide
+#### One Click Startup
 
-### Basic Operation
-1. **Launch App** - Run `npm start`
-2. **Select Languages** - Choose source (speech) and target (translation) languages
-3. **Start Recording** - Click record button or press `Ctrl+Space`
-4. **Speak Clearly** - Talk normally into your microphone
-5. **View Results** - See live transcription and translation
-6. **Stop Recording** - Click stop or press `Escape`
+ Double click on the `start.bat` file
 
-### Keyboard Shortcuts
-- `Ctrl+Space` - Start/Stop recording
-- `Ctrl+S` - Swap source/target languages
-- `Escape` - Stop recording
 
-### Performance Features
-- **Live Statistics** - Real-time API call monitoring and response times
-- **Memory Tracking** - Monitor application memory usage
-- **Success Rate Monitoring** - Track API call success/failure rates
-- **Error Handling** - Comprehensive error recovery with user feedback
+## 📊 Performance Features
 
-### History & Export
-- **Complete History** - Save both transcriptions and translations
-- **Export Options** - Export conversation history to text files
-- **Copy Functions** - Quick copy of original text or translations
-- **Persistent Storage** - Local storage of conversation history
+### Real-Time Monitoring
+- **API Response Times** - Track Speech-to-Text and Translation latency
+- **Memory Usage** - Monitor application resource consumption  
+- **Connection Status** - Live Google Cloud API connectivity
+- **Stream Health** - Audio processing and reconnection stats
 
-### Tips for Best Results
-- **Speak Clearly** - Enunciate words properly
-- **Minimize Background Noise** - Use headphones if possible
-- **Good Microphone** - Quality audio input improves accuracy
-- **Stable Internet** - Required for Google Cloud APIs
-- **Language Selection** - Choose correct source language for optimal results
+### Optimization Features
+- **Stream Auto-Restart** - Handles service interruptions seamlessly
+- **Audio Buffer Management** - Efficient memory usage
+- **Error Recovery** - Automatic reconnection and retry logic
+- **Performance Metrics** - Historical data for troubleshooting
 
-## 🔧 Development
+## 🌐 Supported Languages
 
-### Project Scripts
-```bash
-npm start          # Launch Electron app
-npm run dev        # Development mode with hot reload
-npm run build      # Build production package
-npm run server     # Start Socket.IO server only
-npm test          # Run test suite
+### Speech Recognition (Input)
+- English (US, UK, AU, IN)
+- Spanish (ES, MX, AR)
+- French (FR, CA)
+- German, Italian, Portuguese
+- Japanese, Korean, Chinese (Mandarin)
+- Arabic, Hindi, Russian
+- And many more languages
+
+### Translation (Output)
+- All Google Translate supported languages (100+)
+- Real-time translation confidence scores
+
+## 🛠️ Architecture
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Electron      │    │   Socket.IO      │    │  Google Cloud   │
+│   Frontend      │◄──►│   Server         │◄──►│  APIs           │
+│                 │    │                  │    │                 │
+│ • UI/UX         │    │ • Audio Stream   │    │ • Speech-to-Text│
+│ • Audio Capture │    │ • Real-time Comm │    │ • Translation   │
+│ • User Controls │    │ • Error Handling │    │ • AI Processing │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
-### Key Components
+### Core Components
 
-#### Electron Main Process (`main.js`)
-- Window management
-- IPC communication
-- Google Cloud API calls
-- Security context isolation
+- **`main.js`** - Electron main process, window management, system tray
+- **`app-google-cloud.js`** - Frontend application with Socket.IO client
+- **`server.js`** - Socket.IO server with Google Cloud integration
+- **`google-cloud-service.js`** - Google Cloud API wrapper service
+- **`preload.js`** - Secure IPC bridge between main and renderer
 
-#### Frontend App (`app-google-cloud.js`)
-- Socket.IO client connection with fallback support
-- Audio capture and streaming
-- UI interaction handling
-- Real-time result processing
-- Performance monitoring and statistics
-- History management with dual-text storage
-- Smart language swapping with fallback logic
-- Error recovery and user feedback
 
-#### Streaming Server (`server.js`)
-- Socket.IO WebSocket server
-- Google Cloud streaming integration
-- Audio data processing
-- Voice activity detection
-
-#### Google Cloud Service (`google-cloud-service.js`)
-- Speech-to-Text API wrapper
-- Translation API integration
-- Error handling and retries
-- Credential management
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-#### "Module not found" errors
-```bash
-rm -rf node_modules package-lock.json
-npm install
-```
+**🔧 App Crashes on Minimize**
+- Fixed in v1.0.0 with robust tray handling
+- Use emergency restore: `Ctrl+Alt+S`
 
-#### Google Cloud authentication errors
-- Verify `credentials.json` is in project root
-- Check service account permissions
-- Ensure APIs are enabled in Google Cloud Console
+**🔧 Stream Cancellation Errors**
+- Auto-restart streaming handles long pauses
+- Check console for reconnection messages
 
-#### Socket.IO connection failed
-- Check if server is running on port 3001
-- Verify no firewall blocking localhost connections
-- Restart both server and desktop app
+**🔧 Missing Tray Icon**
+- Check Windows notification area
+- Look for hidden icons (click "^" arrow)
+- Enable in Windows Settings → Taskbar
 
-#### No audio input detected
-- Check microphone permissions in OS settings
-- Verify microphone is working in other applications
-- Try different audio input device
+**🔧 Audio Not Working**
+- Grant microphone permissions
+- Check system audio settings
+- Restart application if needed
 
-#### Poor transcription accuracy
-- Ensure correct source language is selected
-- Improve audio quality (use headphones, reduce background noise)
-- Speak more clearly and at moderate pace
+**🔧 Google Cloud Errors**
+- Verify `credentials.json` is valid
+- Check API quotas and billing
+- Ensure APIs are enabled
 
 ### Debug Mode
-Enable verbose logging:
+
 ```bash
-DEBUG=speech-translator:* npm start
+npm run dev  # Starts with DevTools open
 ```
 
-## 📈 Performance
-
-### Optimizations Implemented
-- **250ms Audio Chunks** - Optimal balance of latency and quality
-- **Efficient Buffering** - Minimizes memory usage
-- **Connection Pooling** - Reuses Google Cloud connections
-- **Error Recovery** - Automatic retry mechanisms with fallback support
-- **Resource Cleanup** - Proper disposal of audio streams
-- **Performance Tracking** - Real-time monitoring of API calls and system resources
-- **Intelligent Caching** - Smart caching of translation results
-- **Memory Management** - Optimized memory usage with periodic cleanup
-
-### System Requirements
-- **RAM**: 4GB minimum, 8GB recommended
-- **CPU**: Dual-core 2.0GHz or better
-- **Internet**: Stable broadband connection
-- **Storage**: 500MB free space
-
-## 📋 Changelog
-
-### v1.2 (Current) - Enhanced Edition
-- ✅ **Performance Monitoring** - Real-time API call tracking and statistics
-- ✅ **Dual-Text History** - Save both transcriptions and translations
-- ✅ **Smart Language Swapping** - Intelligent language pair matching with fallbacks
-- ✅ **Export Functionality** - Export complete conversation history to text files
-- ✅ **Enhanced Copy Features** - Quick copy buttons for original and translated text
-- ✅ **Simplified Audio Handling** - More reliable microphone input capture
-- ✅ **Memory Usage Tracking** - Live memory monitoring and optimization
-- ✅ **Improved Error Handling** - Comprehensive error recovery and user feedback
-
-### v1.1 - Performance Edition  
-- ✅ **Live Statistics Dashboard** - Real-time performance monitoring
-- ✅ **API Response Tracking** - Monitor response times and success rates
-- ✅ **Memory Usage Indicators** - Track application memory consumption
-- ✅ **Enhanced Error Recovery** - Better handling of API failures
-
-### v1.0 - Initial Release
-- ✅ **Real-Time Speech Recognition** - Google Cloud Speech-to-Text integration
-- ✅ **Live Translation** - Multi-language translation support
-- ✅ **Socket.IO Streaming** - Low-latency audio processing
-- ✅ **Modern Desktop UI** - Professional Electron-based interface
-
-## 🔒 Security & Privacy
-
-### Data Handling
-- **No Local Storage** - Audio data is processed in real-time only
-- **Secure Transmission** - All data encrypted in transit
-- **Google Cloud Privacy** - Follows Google's data protection policies
-- **No Audio Recording** - Audio is streamed, not saved locally
-
-### Credentials Security
-- Keep `credentials.json` secure and private
-- Never commit credentials to version control
-- Rotate service account keys regularly
-- Use least-privilege access principles
-
-## 🚧 Recent Improvements (v1.2)
-
-### Performance Monitoring
-- **Real-time Statistics** - Live API call tracking, response times, and success rates
-- **Memory Usage Tracking** - Monitor application memory consumption
-- **Performance Dashboard** - Visual indicators for system health
-- **Error Tracking** - Comprehensive error logging and recovery
-
-### Enhanced History System
-- **Dual-Text Storage** - Save both original transcription and translation
-- **Export Functionality** - Export complete conversation history to text files
-- **Copy Options** - Quick copy buttons for both original and translated text
-- **Persistent Storage** - Local storage with history limit management (100 items)
-
-### Smart Language Features
-- **Intelligent Language Swapping** - Automatic language pair matching with fallbacks
-- **Cross-Language Compatibility** - Smart matching between speech and translation languages
-- **Language Code Conversion** - Automatic conversion between different language code formats
-
-### Simplified Audio Handling
-- **Reliable Microphone Input** - Simplified audio capture for better stability
-- **Enhanced Error Handling** - Specific error messages for different audio issues
-- **Improved Permissions** - Better handling of microphone access permissions
-
-## 🚧 Known Limitations
-
-- **Windows Optimized** - Currently optimized for Windows platform
-- **Internet Required** - Requires active internet for Google Cloud APIs  
-- **Microphone Input Only** - Currently supports microphone input (system audio capture removed for stability)
-- **Single User** - Designed for individual use, not multi-user sessions
-
-## 🛣️ Roadmap
-
-See `plan.md` for detailed development roadmap and future features.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Console output shows:
+- Google Cloud connection status
+- Audio stream health
+- Tray creation success
+- Performance metrics
 
 ## 🤝 Contributing
 
@@ -350,13 +197,23 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 4. Push to branch (`git push origin feature/amazing-feature`)
 5. Open Pull Request
 
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **Google Cloud AI** - Speech recognition and translation services
+- **Socket.IO** - Real-time communication framework
+- **Electron** - Cross-platform desktop application framework
+- **Node.js Community** - Extensive package ecosystem
+
 ## 📞 Support
 
-For issues and questions:
-- **GitHub Issues** - [Create an issue](https://github.com/chirag23177/speech_to_text/issues)
-- **Documentation** - Check this README and `plan.md`
-- **Google Cloud Docs** - [Speech-to-Text](https://cloud.google.com/speech-to-text/docs) | [Translate](https://cloud.google.com/translate/docs)
+- **Issues:** [GitHub Issues](https://github.com/chirag23177/speech_to_text/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/chirag23177/speech_to_text/discussions)
+
 
 ---
 
-Made by [Chirag](https://github.com/chirag23177)
+Made by [Chirag Yadav](https://github.com/chirag23177)

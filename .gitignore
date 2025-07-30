@@ -19,6 +19,24 @@ yarn-error.log*
 # Build outputs
 dist/
 build/
+
+# Temporary and development files
+*.tmp
+*.temp
+*-OLD.*
+*-BACKUP.*
+test-*.md
+debug-*.txt
+tray-troubleshooting.md
+create-icon.js
+
+# IDE and editor files
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+build/
 out/
 
 # Electron build artifacts
